@@ -1,59 +1,32 @@
-//
-//  ContentView.swift
-//  DiffZen
-//
-//  Created by Levi on 2026/8/18.
-//
-
 import SwiftUI
-import SwiftData
 
 struct ContentView: View {
-    @Environment(\.modelContext) private var modelContext
-    @Query private var items: [Item]
+    @State private var session = ComparisonSession()
 
     var body: some View {
-        NavigationSplitView {
-            List {
-                ForEach(items) { item in
-                    NavigationLink {
-                        Text("Item at \(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))")
-                    } label: {
-                        Text(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))
-                    }
-                }
-                .onDelete(perform: deleteItems)
+        Group {
+            if session.isWorkspacePresented {
+                ComparisonView(session: session)
+            } else {
+                NewComparisonView(session: session)
             }
-            .navigationSplitViewColumnWidth(min: 180, ideal: 200)
-            .toolbar {
-                ToolbarItem {
-                    Button(action: addItem) {
-                        Label("Add Item", systemImage: "plus")
-                    }
-                }
-            }
-        } detail: {
-            Text("Select an item")
+        }
+        .frame(minWidth: 920, maxWidth: .infinity, minHeight: 600, maxHeight: .infinity)
+        .alert("操作失败", isPresented: errorBinding) {
+            Button("好", action: session.dismissError)
+        } message: {
+            Text(session.errorMessage ?? "未知错误")
         }
     }
 
-    private func addItem() {
-        withAnimation {
-            let newItem = Item(timestamp: Date())
-            modelContext.insert(newItem)
-        }
-    }
-
-    private func deleteItems(offsets: IndexSet) {
-        withAnimation {
-            for index in offsets {
-                modelContext.delete(items[index])
-            }
-        }
+    private var errorBinding: Binding<Bool> {
+        Binding(
+            get: { session.errorMessage != nil },
+            set: { if !$0 { session.dismissError() } }
+        )
     }
 }
 
 #Preview {
     ContentView()
-        .modelContainer(for: Item.self, inMemory: true)
 }
