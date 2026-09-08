@@ -20,11 +20,11 @@ struct NewComparisonView: View {
                     .foregroundStyle(.secondary)
             }
             HStack(spacing: 14) {
-                FileChoiceCard(side: .left, url: leftURL, choose: chooseLeft)
+                FileChoiceCard(side: .left, url: leftURL, choose: chooseLeft, onDropURL: { leftURL = $0 })
                 Image(systemName: "arrow.left.arrow.right")
                     .foregroundStyle(.tertiary)
                     .accessibilityHidden(true)
-                FileChoiceCard(side: .right, url: rightURL, choose: chooseRight)
+                FileChoiceCard(side: .right, url: rightURL, choose: chooseRight, onDropURL: { rightURL = $0 })
             }
             HStack(spacing: 12) {
                 Button("空白对比", systemImage: "doc.badge.plus", action: session.startBlank)

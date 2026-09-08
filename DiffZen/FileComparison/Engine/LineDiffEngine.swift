@@ -5,9 +5,30 @@ nonisolated enum LineDiffEngine {
         left: ParsedTextFile,
         right: ParsedTextFile,
         leftRevision: Int = 0,
-        rightRevision: Int = 0
+        rightRevision: Int = 0,
+        options: ComparisonOptions = .default
     ) -> DiffResult {
-        let difference = right.lines.difference(from: left.lines)
+        var linePool: [String: Int] = [:]
+        linePool.reserveCapacity(left.lines.count + right.lines.count)
+        var nextID = 0
+
+        func intern(_ line: String) -> Int {
+            if let existing = linePool[line] {
+                return existing
+            }
+            let id = nextID
+            linePool[line] = id
+            nextID += 1
+            return id
+        }
+
+        let leftComparable = left.lines.map { normalizeLine($0, options: options) }
+        let rightComparable = right.lines.map { normalizeLine($0, options: options) }
+
+        let leftIDs = leftComparable.map(intern)
+        let rightIDs = rightComparable.map(intern)
+
+        let difference = rightIDs.difference(from: leftIDs)
         let removedOffsets = Set(difference.removals.compactMap { change -> Int? in
             guard case let .remove(offset, _, _) = change else { return nil }
             return offset
@@ -26,6 +47,8 @@ nonisolated enum LineDiffEngine {
             if isUnchanged(
                 left: left,
                 right: right,
+                leftComparable: leftComparable,
+                rightComparable: rightComparable,
                 leftIndex: leftIndex,
                 rightIndex: rightIndex,
                 removedOffsets: removedOffsets,
@@ -126,6 +149,8 @@ nonisolated enum LineDiffEngine {
     private static func isUnchanged(
         left: ParsedTextFile,
         right: ParsedTextFile,
+        leftComparable: [String],
+        rightComparable: [String],
         leftIndex: Int,
         rightIndex: Int,
         removedOffsets: Set<Int>,
@@ -135,7 +160,22 @@ nonisolated enum LineDiffEngine {
             && rightIndex < right.lines.count
             && !removedOffsets.contains(leftIndex)
             && !insertedOffsets.contains(rightIndex)
-            && left.lines[leftIndex] == right.lines[rightIndex]
+            && leftComparable[leftIndex] == rightComparable[rightIndex]
+    }
+
+    private static func normalizeLine(_ line: String, options: ComparisonOptions) -> String {
+        var result = line
+        if options.ignoreCase {
+            result = result.lowercased()
+        }
+        if options.ignoreWhitespace {
+            result = result.filter { !$0.isWhitespace }
+        } else if options.ignoreTrailingWhitespace {
+            while result.last?.isWhitespace == true {
+                result.removeLast()
+            }
+        }
+        return result
     }
 
     private static func appendFallbackRow(

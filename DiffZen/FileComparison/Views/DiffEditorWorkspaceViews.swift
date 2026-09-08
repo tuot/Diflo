@@ -39,60 +39,75 @@ enum MeldTheme {
     }
 }
 
-// MARK: - Meld 原生双栏工作区 (完全还原 Meld 左右双编辑器与中央贝塞尔连线)
+// MARK: - Meld 原生双栏工作区 (宽高严格以 App 为准，内容超出内部滚动，左右严格 1:1 平分)
 
 struct MeldDualEditorWorkspaceView: View {
     let session: ComparisonSession
 
     @Environment(\.colorScheme) private var colorScheme
     private var isDark: Bool { colorScheme == .dark }
-    private let rowHeight: CGFloat = 22
-    private let charWidth: CGFloat = {
-        let font = NSFont.monospacedSystemFont(ofSize: 12.5, weight: .regular)
-        return ("M" as NSString).size(withAttributes: [.font: font]).width
-    }()
+    private let rowHeight: CGFloat = 20.0
+    private let topPadding: CGFloat = 6.0
+    private let charWidth: CGFloat = 7.82
 
     var body: some View {
-        HStack(spacing: 0) {
-            // 左侧编辑区域 (带标尺与多行代码输入)
-            editorPane(side: .left)
+        GeometryReader { geometry in
+            let viewportHeight = geometry.size.height
+            let maxLineCount = max(session.leftBuffer.lineCount, session.rightBuffer.lineCount, 1)
+            let neededHeight = topPadding * 2 + CGFloat(maxLineCount) * rowHeight + 80
+            let contentHeight = max(viewportHeight, neededHeight)
+
+            HStack(spacing: 0) {
+                // 1. 核心滚动工作区：左右双栏与中央连线统一协同滚动 (绝不改变外框尺寸)
+                ScrollView(.vertical) {
+                    HStack(spacing: 0) {
+                        // 左侧编辑区域 (严格平分 50% 宽度)
+                        editorPane(side: .left, contentHeight: contentHeight)
+                            .frame(maxWidth: .infinity)
+
+                        Divider()
+
+                        // 中央 Gutter 连线带 (与代码绝对同频滚动)
+                        centralGutter(contentHeight: contentHeight)
+                            .frame(width: 58)
+
+                        Divider()
+
+                        // 右侧编辑区域 (严格平分 50% 宽度)
+                        editorPane(side: .right, contentHeight: contentHeight)
+                            .frame(maxWidth: .infinity)
+                    }
+                    .frame(minHeight: viewportHeight)
+                }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .clipped()
 
-            Divider()
+                Divider()
 
-            // 中央 Gutter 连线带 (LinkMap & 左右双向操作通道)
-            centralGutter
-                .frame(width: 64)
+                // 2. 右侧常驻小地图 (Overview)
+                SwiftUIOverviewView(
+                    hunks: session.result?.hunks ?? [],
+                    totalLines: maxLineCount
+                )
+                .frame(width: 14)
                 .frame(maxHeight: .infinity)
-
-            Divider()
-
-            // 右侧编辑区域 (带标尺与多行代码输入)
-            editorPane(side: .right)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-            Divider()
-
-            // 右侧全局小地图 (Overview)
-            SwiftUIOverviewView(
-                hunks: session.result?.hunks ?? [],
-                totalLines: max(session.leftBuffer.lineCount, session.rightBuffer.lineCount, 1)
-            )
-            .frame(width: 14)
-            .frame(maxHeight: .infinity)
+            }
+            .frame(width: geometry.size.width, height: geometry.size.height)
         }
+        .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+        .clipped()
     }
 
     // MARK: - 单侧编辑器面板 (标尺 + 代码区)
 
     @ViewBuilder
-    private func editorPane(side: ComparisonSide) -> some View {
+    private func editorPane(side: ComparisonSide, contentHeight: CGFloat) -> some View {
         let buffer = side == .left ? session.leftBuffer : session.rightBuffer
         let oppositeBuffer = side == .left ? session.rightBuffer : session.leftBuffer
         let lineCount = max(buffer.lineCount, 1)
 
         HStack(spacing: 0) {
-            // 1. 标尺行号列
+            // 1. 标尺行号列 (严格与文本每行基线对齐)
             VStack(alignment: .trailing, spacing: 0) {
                 ForEach(0..<lineCount, id: \.self) { lineIndex in
                     HStack(spacing: 3) {
@@ -115,7 +130,7 @@ struct MeldDualEditorWorkspaceView: View {
                 }
                 Spacer(minLength: 0)
             }
-            .padding(.top, 4)
+            .padding(.top, topPadding)
             .frame(width: 44)
             .background(Color(nsColor: .controlBackgroundColor).opacity(0.85))
 
@@ -134,7 +149,7 @@ struct MeldDualEditorWorkspaceView: View {
                                 .fill(rowBackgroundColor(for: side, lineIndex: lineIndex))
                                 .frame(height: rowHeight)
 
-                            // 行内字符高亮 (Intra-line diff highlight)
+                            // 行内字符高亮 (严格以行首为基准，绝不居中漂浮)
                             if diffKind(for: side, lineIndex: lineIndex) == .modified {
                                 let currentLine = lineIndex < buffer.lines.count ? buffer.lines[lineIndex] : ""
                                 let oppLine = lineIndex < oppositeBuffer.lines.count ? oppositeBuffer.lines[lineIndex] : ""
@@ -145,10 +160,14 @@ struct MeldDualEditorWorkspaceView: View {
                                     let range = ranges[idx]
                                     let startX = 11.0 + CGFloat(range.location) * charWidth
                                     let width = CGFloat(range.length) * charWidth
-                                    RoundedRectangle(cornerRadius: 2)
-                                        .fill(MeldTheme.inlineDiffBackground(isDark: isDark))
-                                        .frame(width: max(width, 4), height: rowHeight - 4)
-                                        .offset(x: startX, y: 0)
+
+                                    HStack(spacing: 0) {
+                                        Spacer().frame(width: startX)
+                                        RoundedRectangle(cornerRadius: 2)
+                                            .fill(MeldTheme.inlineDiffBackground(isDark: isDark))
+                                            .frame(width: max(width, 6), height: rowHeight - 3)
+                                        Spacer(minLength: 0)
+                                    }
                                 }
                             }
                         }
@@ -156,38 +175,40 @@ struct MeldDualEditorWorkspaceView: View {
                     }
                     Spacer(minLength: 0)
                 }
-                .padding(.top, 4)
+                .padding(.top, topPadding)
                 .allowsHitTesting(false)
 
-                // 真实文本编辑框 (TextEditor)
+                // 真实文本编辑框 (TextEditor，高度跟随内容延伸，统一由外部平滑滚动)
                 TextEditor(text: Binding(
                     get: { buffer.text },
                     set: { session.edit(side, text: $0) }
                 ))
-                .font(.system(size: 12.5, design: .monospaced))
+                .font(.system(size: 13, weight: .regular, design: .monospaced))
                 .lineSpacing(4)
                 .scrollContentBackground(.hidden)
                 .background(.clear)
                 .padding(.horizontal, 6)
-                .padding(.top, 2)
+                .padding(.top, topPadding)
+                .frame(minHeight: contentHeight)
 
                 // 空白占位文字
                 if buffer.text.isEmpty {
                     Text(side == .left ? "输入或粘贴左侧文本..." : "输入或粘贴右侧文本...")
-                        .font(.system(size: 12.5, design: .monospaced))
+                        .font(.system(size: 13, design: .monospaced))
                         .foregroundStyle(.tertiary)
                         .padding(.leading, 11)
-                        .padding(.top, 5)
+                        .padding(.top, topPadding + 2)
                         .allowsHitTesting(false)
                 }
             }
         }
+        .frame(minHeight: contentHeight)
     }
 
     // MARK: - 中央 Gutter 连线带 (Cubic Bézier LinkMap & 分离式合并箭头)
 
     @ViewBuilder
-    private var centralGutter: some View {
+    private func centralGutter(contentHeight: CGFloat) -> some View {
         ZStack {
             Color(nsColor: .controlBackgroundColor).opacity(0.4)
 
@@ -195,10 +216,10 @@ struct MeldDualEditorWorkspaceView: View {
             Canvas { context, size in
                 guard let hunks = session.result?.hunks else { return }
                 for hunk in hunks {
-                    let leftY1 = 4.0 + CGFloat(hunk.leftLineRange.lowerBound) * rowHeight
-                    let leftY2 = 4.0 + CGFloat(max(hunk.leftLineRange.upperBound, hunk.leftLineRange.lowerBound + 1)) * rowHeight
-                    let rightY1 = 4.0 + CGFloat(hunk.rightLineRange.lowerBound) * rowHeight
-                    let rightY2 = 4.0 + CGFloat(max(hunk.rightLineRange.upperBound, hunk.rightLineRange.lowerBound + 1)) * rowHeight
+                    let leftY1 = topPadding + CGFloat(hunk.leftLineRange.lowerBound) * rowHeight
+                    let leftY2 = topPadding + CGFloat(max(hunk.leftLineRange.upperBound, hunk.leftLineRange.lowerBound + 1)) * rowHeight
+                    let rightY1 = topPadding + CGFloat(hunk.rightLineRange.lowerBound) * rowHeight
+                    let rightY2 = topPadding + CGFloat(max(hunk.rightLineRange.upperBound, hunk.rightLineRange.lowerBound + 1)) * rowHeight
 
                     var path = Path()
                     path.move(to: CGPoint(x: 0, y: leftY1))
@@ -226,8 +247,8 @@ struct MeldDualEditorWorkspaceView: View {
             // 合并操作按钮：左侧向右箭头 (贴近左文件) 与 右侧向左箭头 (贴近右文件)
             if let hunks = session.result?.hunks {
                 ForEach(hunks) { hunk in
-                    let leftY = 4.0 + CGFloat(hunk.leftLineRange.lowerBound) * rowHeight + rowHeight / 2.0
-                    let rightY = 4.0 + CGFloat(hunk.rightLineRange.lowerBound) * rowHeight + rowHeight / 2.0
+                    let leftY = topPadding + CGFloat(hunk.leftLineRange.lowerBound) * rowHeight + rowHeight / 2.0
+                    let rightY = topPadding + CGFloat(hunk.rightLineRange.lowerBound) * rowHeight + rowHeight / 2.0
 
                     // 1. 左侧动作：将左侧该差异推向右侧 (→)
                     Button {
@@ -253,10 +274,11 @@ struct MeldDualEditorWorkspaceView: View {
                     }
                     .buttonStyle(.plain)
                     .help("将右侧内容合并至左侧 (←)")
-                    .position(x: 51, y: rightY)
+                    .position(x: 45, y: rightY)
                 }
             }
         }
+        .frame(minHeight: contentHeight)
     }
 
     // MARK: - 辅助计算方法
@@ -357,6 +379,3 @@ struct SwiftUIOverviewView: View {
         }
     }
 }
-
-
-

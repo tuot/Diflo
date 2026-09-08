@@ -67,8 +67,7 @@ struct ComparisonWorkspaceView: View {
                 Divider().zIndex(10)
             }
 
-            // 3. 中间对比工作区：Meld 官方级双栏编辑器与贝塞尔曲面连线
-            // 3. 中间对比工作区：Meld 官方级双栏编辑器与贝塞尔曲面连线
+            // 3. 中间对比工作区：Meld 官方级纯 SwiftUI 双栏编辑器与贝塞尔曲面连线 (默认严格 1:1 平分宽度，自适应撑大)
             MeldDualEditorWorkspaceView(session: session)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .layoutPriority(1)
@@ -99,6 +98,9 @@ struct ComparisonWorkspaceView: View {
             if let newID, let hunk = session.result?.hunks.first(where: { $0.id == newID }) {
                 scrollCoordinator.scrollTo(hunk: hunk)
             }
+        }
+        .onChange(of: session.result?.hunks) { _, newHunks in
+            scrollCoordinator.updateHunks(newHunks ?? [])
         }
     }
 

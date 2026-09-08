@@ -26,12 +26,6 @@ struct DiffOverviewRepresentable: NSViewRepresentable {
         configure(nsView)
     }
 
-    func sizeThatFits(_ proposal: ProposedViewSize, nsView: DiffOverviewView, context: Context) -> CGSize? {
-        CGSize(
-            width: 14,
-            height: proposal.height ?? 500
-        )
-    }
 
     private func configure(_ view: DiffOverviewView) {
         view.configure(

@@ -34,6 +34,34 @@ struct WorkspaceToolbar: View {
                     Button("删除右侧块") { session.deleteHunk(hunk, from: .right) }
                 }
             }
+            Divider().frame(height: 18)
+            Menu {
+                Toggle("忽略行尾空白", isOn: Binding(
+                    get: { session.options.ignoreTrailingWhitespace },
+                    set: { var opts = session.options; opts.ignoreTrailingWhitespace = $0; session.setOptions(opts) }
+                ))
+                Toggle("忽略所有空白", isOn: Binding(
+                    get: { session.options.ignoreWhitespace },
+                    set: { var opts = session.options; opts.ignoreWhitespace = $0; session.setOptions(opts) }
+                ))
+                Toggle("忽略大小写", isOn: Binding(
+                    get: { session.options.ignoreCase },
+                    set: { var opts = session.options; opts.ignoreCase = $0; session.setOptions(opts) }
+                ))
+            } label: {
+                Label("比较选项", systemImage: "slider.horizontal.3")
+            }
+            .menuStyle(.borderlessButton)
+            .fixedSize()
+
+            Menu {
+                Button("全部采纳左侧内容 (→)") { session.applyAllHunks(from: .left) }
+                Button("全部采纳右侧内容 (←)") { session.applyAllHunks(from: .right) }
+            } label: {
+                Label("批量合并", systemImage: "arrow.triangle.merge")
+            }
+            .menuStyle(.borderlessButton)
+            .fixedSize()
             Spacer()
             if session.isWorking { ProgressView().controlSize(.small) }
             Text(summary)

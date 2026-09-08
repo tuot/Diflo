@@ -5,12 +5,13 @@ actor ComparisonWorker: ComparisonWorking {
         try TextFileLoader.load(from: url)
     }
 
-    func compare(left: EditorBuffer, right: EditorBuffer) async -> DiffResult {
+    func compare(left: EditorBuffer, right: EditorBuffer, options: ComparisonOptions = .default) async -> DiffResult {
         LineDiffEngine.compare(
             left: left.asParsedFile(),
             right: right.asParsedFile(),
             leftRevision: left.revision,
-            rightRevision: right.revision
+            rightRevision: right.revision,
+            options: options
         )
     }
 

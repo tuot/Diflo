@@ -50,6 +50,54 @@ struct IntraLineDiffEngineTests {
         #expect(left.isEmpty)
         #expect(right == [NSRange(location: 5, length: 6)])
     }
+
+    @Test func identifiesMultipleDiscreteChangesInSingleLine() {
+        let (left, right) = IntraLineDiffEngine.diff(left: "func foo(a: Int, b: String)", right: "func bar(a: Double, b: String)")
+        // "foo" -> "bar" (location 5, length 3)
+        // "Int" -> "Double" (location 13, length 3 vs location 13, length 6)
+        #expect(left.count == 2)
+        #expect(right.count == 2)
+        #expect(left[0] == NSRange(location: 5, length: 3))
+        #expect(right[0] == NSRange(location: 5, length: 3))
+    }
+}
+
+struct ComparisonOptionsTests {
+    @Test func ignoreCaseTreatsDifferentCasedLinesAsUnchanged() {
+        let left = LineParser.parse("Hello WORLD\n", url: fixtureURL("1.txt"), encodingName: "UTF-8")
+        let right = LineParser.parse("hello world\n", url: fixtureURL("2.txt"), encodingName: "UTF-8")
+
+        var options = ComparisonOptions.default
+        let diffDefault = LineDiffEngine.compare(left: left, right: right, options: options)
+        #expect(diffDefault.differenceCount == 1)
+
+        options.ignoreCase = true
+        let diffIgnored = LineDiffEngine.compare(left: left, right: right, options: options)
+        #expect(diffIgnored.differenceCount == 0)
+    }
+
+    @Test func ignoreWhitespaceTreatsSpacesAsUnchanged() {
+        let left = LineParser.parse("let a = 1;\n", url: fixtureURL("1.txt"), encodingName: "UTF-8")
+        let right = LineParser.parse("let   a   =   1;\n", url: fixtureURL("2.txt"), encodingName: "UTF-8")
+
+        var options = ComparisonOptions.default
+        let diffDefault = LineDiffEngine.compare(left: left, right: right, options: options)
+        #expect(diffDefault.differenceCount == 1)
+
+        options.ignoreWhitespace = true
+        let diffIgnored = LineDiffEngine.compare(left: left, right: right, options: options)
+        #expect(diffIgnored.differenceCount == 0)
+    }
+
+    @Test func ignoreTrailingWhitespaceTreatsEndSpacesAsUnchanged() {
+        let left = LineParser.parse("let a = 1\n", url: fixtureURL("1.txt"), encodingName: "UTF-8")
+        let right = LineParser.parse("let a = 1   \n", url: fixtureURL("2.txt"), encodingName: "UTF-8")
+
+        var options = ComparisonOptions.default
+        options.ignoreTrailingWhitespace = true
+        let diff = LineDiffEngine.compare(left: left, right: right, options: options)
+        #expect(diff.differenceCount == 0)
+    }
 }
 
 struct EditorBufferTests {
@@ -89,7 +137,8 @@ struct EditorBufferTests {
 
 struct DiffTextViewRenderingTests {
     @Test @MainActor func laysOutTypedGlyphsInsideTheVisibleEditorFrame() throws {
-        let editor = DiffTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
+        let editor = DiffTextView.createStandard(side: .left)
+        editor.frame = NSRect(x: 0, y: 0, width: 600, height: 400)
         let left = EditorBuffer.blank(named: "左侧").updatingText("left")
         let right = EditorBuffer.blank(named: "右侧").updatingText("right")
         let result = LineDiffEngine.compare(left: left.asParsedFile(), right: right.asParsedFile())
@@ -407,8 +456,22 @@ struct DiffRowPresentationTests {
 }
 
 struct EditableDiffContainerTests {
+    @Test @MainActor func standardFactoryRetainsTextSystemAndAcceptsTyping() throws {
+        let textView = DiffTextView.createStandard(side: .left)
+        #expect(textView.textStorage != nil)
+        #expect(textView.layoutManager != nil)
+        #expect(textView.textContainer != nil)
+        #expect(textView.isEditable)
+        #expect(textView.isSelectable)
+        #expect(textView.acceptsFirstResponder)
+
+        textView.insertText("hello", replacementRange: NSRange(location: 0, length: 0))
+        #expect(textView.string == "hello")
+    }
+
     @Test @MainActor func blankLeftPaneAcceptsKeyboardInput() throws {
-        let textView = DiffTextView(frame: NSRect(x: 0, y: 0, width: 400, height: 500))
+        let textView = DiffTextView.createStandard(side: .left)
+        textView.frame = NSRect(x: 0, y: 0, width: 400, height: 500)
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 400, height: 500),
             styleMask: [.titled, .resizable],
@@ -420,7 +483,7 @@ struct EditableDiffContainerTests {
             text: "",
             lineCount: 0,
             hunks: [],
-            side: .left,
+            side: ComparisonSide.left,
             selectedHunkID: nil
         )
         window.makeKeyAndOrderFront(nil)
@@ -432,6 +495,91 @@ struct EditableDiffContainerTests {
         textView.insertText("hello", replacementRange: NSRange(location: 0, length: 0))
 
         #expect(textView.string == "hello")
+    }
+
+    @Test @MainActor func customDiffEditorViewRendersEmptyStateAndAcceptsInput() throws {
+        let editor = CustomDiffEditorView(side: .left)
+        editor.configure(text: "", hunks: [], selectedHunkID: nil)
+
+        #expect(editor.lines.isEmpty)
+        #expect(editor.caretLine == 0)
+        #expect(editor.caretColumn == 0)
+        #expect(!editor.placeholderString.isEmpty)
+
+        // 测试文字输入
+        editor.insertText("first line", replacementRange: NSRange(location: 0, length: 0))
+        #expect(editor.text == "first line")
+        #expect(editor.lines == ["first line"])
+        #expect(editor.caretColumn == 10)
+
+        // 测试换行
+        editor.insertNewline(nil)
+        #expect(editor.lines == ["first line", ""])
+        #expect(editor.caretLine == 1)
+        #expect(editor.caretColumn == 0)
+
+        // 测试第二行录入
+        editor.insertText("second", replacementRange: NSRange(location: 0, length: 0))
+        #expect(editor.lines == ["first line", "second"])
+        #expect(editor.caretColumn == 6)
+
+        // 测试退格删除与跨行合并
+        for _ in 0..<6 {
+            editor.deleteBackward(nil)
+        }
+        #expect(editor.lines == ["first line", ""])
+        editor.deleteBackward(nil) // 合并回上一行
+        #expect(editor.lines == ["first line"])
+        #expect(editor.caretLine == 0)
+        #expect(editor.caretColumn == 10)
+    }
+
+    @Test @MainActor func scrollViewWithDiffTextViewRendersTextCorrectly() throws {
+        let scrollView = NSScrollView(frame: NSRect(x: 0, y: 0, width: 400, height: 500))
+        let textView = DiffTextView.createStandard(side: .left)
+
+        scrollView.documentView = textView
+        scrollView.hasVerticalScroller = true
+        scrollView.drawsBackground = true
+        scrollView.backgroundColor = .textBackgroundColor
+
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 400, height: 500),
+            styleMask: [.titled, .resizable],
+            backing: .buffered,
+            defer: false
+        )
+        window.contentView = scrollView
+        window.makeKeyAndOrderFront(nil)
+
+        textView.configure(
+            text: "Hello World\nLine 2",
+            lineCount: 2,
+            hunks: [],
+            side: .left,
+            selectedHunkID: nil
+        )
+        textView.resizeDocument(minimumSize: scrollView.contentSize)
+
+        let lm = try #require(textView.layoutManager)
+        let tc = try #require(textView.textContainer)
+        let glyphCount = lm.numberOfGlyphs
+        let usedRect = lm.usedRect(for: tc)
+
+        let rep = scrollView.bitmapImageRepForCachingDisplay(in: scrollView.bounds)!
+        scrollView.cacheDisplay(in: scrollView.bounds, to: rep)
+        var darkCount = 0
+        for y in 0..<rep.pixelsHigh {
+            for x in 10..<rep.pixelsWide {
+                let color = rep.colorAt(x: x, y: y)!
+                if color.redComponent < 0.5 && color.greenComponent < 0.5 && color.blueComponent < 0.5 {
+                    darkCount += 1
+                }
+            }
+        }
+        #expect(glyphCount > 0)
+        #expect(usedRect.height > 0)
+        #expect(darkCount > 10, "Text must be drawn onto the scroll view!")
     }
 }
 
@@ -483,12 +631,13 @@ private actor TestComparisonWorker: ComparisonWorking {
         return file
     }
 
-    func compare(left: EditorBuffer, right: EditorBuffer) async -> DiffResult {
+    func compare(left: EditorBuffer, right: EditorBuffer, options: ComparisonOptions = .default) async -> DiffResult {
         LineDiffEngine.compare(
             left: left.asParsedFile(),
             right: right.asParsedFile(),
             leftRevision: left.revision,
-            rightRevision: right.revision
+            rightRevision: right.revision,
+            options: options
         )
     }
 

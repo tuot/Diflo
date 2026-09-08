@@ -20,12 +20,6 @@ struct ChangeGutterRepresentable: NSViewRepresentable {
         configure(nsView)
     }
 
-    func sizeThatFits(_ proposal: ProposedViewSize, nsView: ChangeGutterView, context: Context) -> CGSize? {
-        CGSize(
-            width: 58,
-            height: proposal.height ?? 600
-        )
-    }
 
     private func configure(_ view: ChangeGutterView) {
         view.configure(

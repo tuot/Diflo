@@ -16,6 +16,7 @@ final class ComparisonSession {
     private(set) var isWorking = false
     private(set) var errorMessage: String?
     private(set) var selectedHunkID: DiffHunk.ID?
+    private(set) var options = ComparisonOptions.default
 
     var hasUnsavedChanges: Bool { leftBuffer.isDirty || rightBuffer.isDirty }
     var selectedHunk: DiffHunk? { result?.hunks.first { $0.id == selectedHunkID } }
@@ -147,6 +148,17 @@ final class ComparisonSession {
         return true
     }
 
+    func setOptions(_ newOptions: ComparisonOptions) {
+        guard options != newOptions else { return }
+        options = newOptions
+        scheduleComparison(debounced: false)
+    }
+
+    func applyAllHunks(from source: ComparisonSide) {
+        let sourceText = buffer(for: source).text
+        edit(source == .left ? .right : .left, text: sourceText)
+    }
+
     func dismissError() {
         errorMessage = nil
     }
@@ -157,6 +169,7 @@ final class ComparisonSession {
         let generation = comparisonGeneration
         let left = leftBuffer
         let right = rightBuffer
+        let opts = options
         let worker = worker
         isWorking = true
 
@@ -169,7 +182,7 @@ final class ComparisonSession {
                 }
             }
             guard !Task.isCancelled else { return }
-            let newResult = await worker.compare(left: left, right: right)
+            let newResult = await worker.compare(left: left, right: right, options: opts)
             guard let self, generation == self.comparisonGeneration else { return }
             self.result = newResult
             if !newResult.hunks.contains(where: { $0.id == self.selectedHunkID }) {

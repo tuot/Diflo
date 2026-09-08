@@ -11,6 +11,21 @@ final class LineNumberRulerView: NSRulerView {
         self.side = side
         super.init(scrollView: scrollView, orientation: .verticalRuler)
         ruleThickness = 62
+        scrollView.contentView.postsBoundsChangedNotifications = true
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(clipViewBoundsDidChange),
+            name: NSView.boundsDidChangeNotification,
+            object: scrollView.contentView
+        )
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
+
+    @objc private func clipViewBoundsDidChange() {
+        needsDisplay = true
     }
 
     @available(*, unavailable)

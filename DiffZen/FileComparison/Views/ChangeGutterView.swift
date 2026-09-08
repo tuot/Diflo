@@ -64,20 +64,13 @@ final class ChangeGutterView: NSView {
             let leftRect = lineRect(hunk.leftLineRange, offset: leftOffset)
             let rightRect = lineRect(hunk.rightLineRange, offset: rightOffset)
 
-            let path = NSBezierPath()
-            path.move(to: NSPoint(x: 0, y: leftRect.minY))
-            path.curve(
-                to: NSPoint(x: bounds.maxX, y: rightRect.minY),
-                controlPoint1: NSPoint(x: bounds.midX, y: leftRect.minY),
-                controlPoint2: NSPoint(x: bounds.midX, y: rightRect.minY)
-            )
-            path.line(to: NSPoint(x: bounds.maxX, y: rightRect.maxY))
-            path.curve(
-                to: NSPoint(x: 0, y: leftRect.maxY),
-                controlPoint1: NSPoint(x: bounds.midX, y: rightRect.maxY),
-                controlPoint2: NSPoint(x: bounds.midX, y: leftRect.maxY)
-            )
-            path.close()
+            // Viewport culling to maintain 60fps on large files
+            if max(leftRect.maxY, rightRect.maxY) < bounds.minY - 40 ||
+               min(leftRect.minY, rightRect.minY) > bounds.maxY + 40 {
+                continue
+            }
+
+            let path = bezierPath(for: hunk)
 
             let isSelected = hunk.id == selectedHunkID
             let isHovered = hunk.id == hoveredHunkID
@@ -93,6 +86,27 @@ final class ChangeGutterView: NSView {
 
             drawActionButtons(for: hunk, leftRect: leftRect, rightRect: rightRect)
         }
+    }
+
+    private func bezierPath(for hunk: DiffHunk) -> NSBezierPath {
+        let leftRect = lineRect(hunk.leftLineRange, offset: leftOffset)
+        let rightRect = lineRect(hunk.rightLineRange, offset: rightOffset)
+
+        let path = NSBezierPath()
+        path.move(to: NSPoint(x: 0, y: leftRect.minY))
+        path.curve(
+            to: NSPoint(x: bounds.maxX, y: rightRect.minY),
+            controlPoint1: NSPoint(x: bounds.midX, y: leftRect.minY),
+            controlPoint2: NSPoint(x: bounds.midX, y: rightRect.minY)
+        )
+        path.line(to: NSPoint(x: bounds.maxX, y: rightRect.maxY))
+        path.curve(
+            to: NSPoint(x: 0, y: leftRect.maxY),
+            controlPoint1: NSPoint(x: bounds.midX, y: rightRect.maxY),
+            controlPoint2: NSPoint(x: bounds.midX, y: leftRect.maxY)
+        )
+        path.close()
+        return path
     }
 
     override func mouseMoved(with event: NSEvent) {
@@ -113,7 +127,7 @@ final class ChangeGutterView: NSView {
                 foundHunkID = hunk.id
                 foundSide = .left // clicking right button applies from left
                 break
-            } else if abs(cy - point.y) < 18 {
+            } else if bezierPath(for: hunk).contains(point) {
                 foundHunkID = hunk.id
                 break
             }
@@ -156,7 +170,7 @@ final class ChangeGutterView: NSView {
                 select?(hunk.id)
                 apply?(hunk, .left)
                 return
-            } else if abs(cy - point.y) < 18 {
+            } else if bezierPath(for: hunk).contains(point) {
                 select?(hunk.id)
                 return
             }
@@ -165,9 +179,14 @@ final class ChangeGutterView: NSView {
     }
 
     private func lineRect(_ range: Range<Int>, offset: Double) -> NSRect {
-        let start = DiffTextView.verticalInset + Double(range.lowerBound) * DiffTextView.rowHeight - offset
-        let height = max(DiffTextView.rowHeight * Double(range.count), 3)
-        return NSRect(x: 0, y: start, width: bounds.width, height: height)
+        if range.isEmpty {
+            let center = DiffTextView.verticalInset + Double(range.lowerBound) * DiffTextView.rowHeight - offset
+            return NSRect(x: 0, y: center - 1.5, width: bounds.width, height: 3)
+        } else {
+            let start = DiffTextView.verticalInset + Double(range.lowerBound) * DiffTextView.rowHeight - offset
+            let height = DiffTextView.rowHeight * Double(range.count)
+            return NSRect(x: 0, y: start, width: bounds.width, height: height)
+        }
     }
 
     private func centerY(for hunk: DiffHunk) -> Double {
