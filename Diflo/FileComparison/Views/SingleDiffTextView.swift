@@ -50,7 +50,7 @@ struct SingleDiffTextView: NSViewRepresentable {
 
         scrollView.documentView = textView
         scrollView.hasVerticalScroller = true
-        scrollView.hasHorizontalScroller = false
+        scrollView.hasHorizontalScroller = true
         scrollView.autohidesScrollers = true
         scrollView.drawsBackground = false
         scrollView.backgroundColor = .clear
@@ -144,6 +144,7 @@ struct SingleDiffTextView: NSViewRepresentable {
 
             rulerView?.configure(lineCount: buffer.lineCount, hunks: hunks)
             containerView?.setPlaceholderHidden(!buffer.text.isEmpty)
+            textView.resizeDocument(minimumSize: scrollView?.contentSize ?? .zero)
         }
 
         // MARK: - NSTextViewDelegate
@@ -188,6 +189,11 @@ struct SingleDiffTextView: NSViewRepresentable {
 final class DiffEditorContainerView: NSView {
     let scrollView: NSScrollView
     private let placeholderLabel: NSTextField
+
+    override func layout() {
+        super.layout()
+        (scrollView.documentView as? DiffTextView)?.resizeDocument(minimumSize: scrollView.contentSize)
+    }
 
     init(scrollView: NSScrollView, lineNumberView: NSView, placeholder: String) {
         self.scrollView = scrollView

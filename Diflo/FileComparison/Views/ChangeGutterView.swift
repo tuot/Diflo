@@ -53,6 +53,10 @@ final class ChangeGutterView: NSView {
     }
 
     override func draw(_ dirtyRect: NSRect) {
+        NSGraphicsContext.saveGraphicsState()
+        defer { NSGraphicsContext.restoreGraphicsState() }
+        // AppKit may invalidate an ancestor's entire area; never paint over the editors.
+        NSBezierPath(rect: bounds).addClip()
         NSColor.controlBackgroundColor.setFill()
         dirtyRect.fill()
 
@@ -73,11 +77,10 @@ final class ChangeGutterView: NSView {
             let path = bezierPath(for: hunk)
 
             let isSelected = hunk.id == selectedHunkID
-            let isHovered = hunk.id == hoveredHunkID
             let hunkColor = color(for: hunk)
 
-            let alpha: CGFloat = isSelected ? 0.35 : (isHovered ? 0.25 : 0.16)
-            hunkColor.withAlphaComponent(alpha).setFill()
+            let highlight: DiffRowPresentation.Highlight = hunk.kind == .modified ? .modification : (hunk.kind == .leftOnly ? .deletion : .insertion)
+            DiffTextView.backgroundColor(for: highlight, appearance: effectiveAppearance)?.setFill()
             path.fill()
 
             hunkColor.withAlphaComponent(isSelected ? 0.85 : 0.5).setStroke()
@@ -115,9 +118,8 @@ final class ChangeGutterView: NSView {
         var foundSide: ComparisonSide?
 
         for hunk in hunks {
-            let cy = centerY(for: hunk)
-            let leftBtn = leftButtonRect(centerY: cy)
-            let rightBtn = rightButtonRect(centerY: cy)
+            let leftBtn = leftButtonRect(centerY: lineRect(hunk.leftLineRange, offset: leftOffset).midY)
+            let rightBtn = rightButtonRect(centerY: lineRect(hunk.rightLineRange, offset: rightOffset).midY)
 
             if leftBtn.contains(point) {
                 foundHunkID = hunk.id
@@ -158,9 +160,8 @@ final class ChangeGutterView: NSView {
     override func mouseDown(with event: NSEvent) {
         let point = convert(event.locationInWindow, from: nil)
         for hunk in hunks {
-            let cy = centerY(for: hunk)
-            let leftBtn = leftButtonRect(centerY: cy)
-            let rightBtn = rightButtonRect(centerY: cy)
+            let leftBtn = leftButtonRect(centerY: lineRect(hunk.leftLineRange, offset: leftOffset).midY)
+            let rightBtn = rightButtonRect(centerY: lineRect(hunk.rightLineRange, offset: rightOffset).midY)
 
             if leftBtn.contains(point) {
                 select?(hunk.id)
@@ -189,12 +190,6 @@ final class ChangeGutterView: NSView {
         }
     }
 
-    private func centerY(for hunk: DiffHunk) -> Double {
-        let left = lineRect(hunk.leftLineRange, offset: leftOffset)
-        let right = lineRect(hunk.rightLineRange, offset: rightOffset)
-        return (left.midY + right.midY) / 2.0
-    }
-
     private func leftButtonRect(centerY: Double) -> NSRect {
         NSRect(x: 6, y: centerY - 10, width: 20, height: 20)
     }
@@ -204,9 +199,8 @@ final class ChangeGutterView: NSView {
     }
 
     private func drawActionButtons(for hunk: DiffHunk, leftRect: NSRect, rightRect: NSRect) {
-        let cy = (leftRect.midY + rightRect.midY) / 2.0
-        let leftBtn = leftButtonRect(centerY: cy)
-        let rightBtn = rightButtonRect(centerY: cy)
+        let leftBtn = leftButtonRect(centerY: leftRect.midY)
+        let rightBtn = rightButtonRect(centerY: rightRect.midY)
         let hunkColor = color(for: hunk)
 
         // Draw left button (←: copy right to left)
@@ -227,18 +221,12 @@ final class ChangeGutterView: NSView {
     }
 
     private func drawButton(rect: NSRect, arrow: String, isHovered: Bool, tintColor: NSColor) {
-        let path = NSBezierPath(ovalIn: rect)
+        let path = NSBezierPath(roundedRect: rect.insetBy(dx: 1, dy: 1), xRadius: 2, yRadius: 2)
         if isHovered {
             tintColor.withAlphaComponent(0.30).setFill()
             path.fill()
             tintColor.setStroke()
             path.lineWidth = 1.5
-            path.stroke()
-        } else {
-            NSColor.windowBackgroundColor.withAlphaComponent(0.85).setFill()
-            path.fill()
-            NSColor.separatorColor.setStroke()
-            path.lineWidth = 1.0
             path.stroke()
         }
 

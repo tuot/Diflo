@@ -12,6 +12,10 @@ final class DiffOverviewView: NSView {
 
     override var isFlipped: Bool { true }
 
+    private var displayRows: Double {
+        max(Double(totalRows), bounds.height / DiffTextView.rowHeight)
+    }
+
     func configure(
         hunks: [DiffHunk],
         totalRows: Int,
@@ -32,12 +36,16 @@ final class DiffOverviewView: NSView {
     }
 
     override func draw(_ dirtyRect: NSRect) {
+        NSGraphicsContext.saveGraphicsState()
+        defer { NSGraphicsContext.restoreGraphicsState() }
+        // Keep ancestor-sized dirty rectangles inside the narrow overview strip.
+        NSBezierPath(rect: bounds).addClip()
         NSColor.controlBackgroundColor.setFill()
         dirtyRect.fill()
 
         for hunk in hunks {
-            let y = Double(hunk.virtualRowRange.lowerBound) / Double(totalRows) * bounds.height
-            let height = max(3, Double(hunk.virtualRowRange.count) / Double(totalRows) * bounds.height)
+            let y = Double(hunk.virtualRowRange.lowerBound) / max(1, displayRows) * bounds.height
+            let height = max(3, Double(hunk.virtualRowRange.count) / max(1, displayRows) * bounds.height)
             color(for: hunk).setFill()
             NSBezierPath(roundedRect: NSRect(x: 2, y: y, width: bounds.width - 4, height: height), xRadius: 1.5, yRadius: 1.5).fill()
             if hunk.id == selectedHunkID {
@@ -68,7 +76,7 @@ final class DiffOverviewView: NSView {
     override func mouseDown(with event: NSEvent) {
         let point = convert(event.locationInWindow, from: nil)
         let fraction = max(0, min(1, point.y / max(1, bounds.height)))
-        let row = Int(fraction * Double(totalRows))
+        let row = Int(fraction * displayRows)
         let hunk = hunks.min {
             abs($0.virtualRowRange.lowerBound - row) < abs($1.virtualRowRange.lowerBound - row)
         }

@@ -5,37 +5,49 @@ struct WorkspaceToolbar: View {
     let returnToLauncher: () -> Void
     let saveLeft: () -> Void
     let saveRight: () -> Void
+    let saveLeftAs: () -> Void
+    let saveRightAs: () -> Void
 
     var body: some View {
         HStack(spacing: 8) {
             Button("返回", systemImage: "chevron.left", action: returnToLauncher)
             Divider().frame(height: 18)
             Button("上一个差异", systemImage: "chevron.up", action: session.selectPreviousHunk)
+                .labelStyle(.iconOnly)
+                .help("上一个差异 (⌘↑)")
                 .keyboardShortcut(.upArrow, modifiers: [.command])
                 .disabled(session.result?.hunks.isEmpty != false)
             Button("下一个差异", systemImage: "chevron.down", action: session.selectNextHunk)
+                .labelStyle(.iconOnly)
+                .help("下一个差异 (⌘↓)")
                 .keyboardShortcut(.downArrow, modifiers: [.command])
                 .disabled(session.result?.hunks.isEmpty != false)
-            Divider().frame(height: 18)
-            Button("撤销", systemImage: "arrow.uturn.backward", action: undo).labelStyle(.iconOnly)
-            Button("重做", systemImage: "arrow.uturn.forward", action: redo).labelStyle(.iconOnly)
-            Button("交换两侧", systemImage: "arrow.left.arrow.right", action: session.swapBuffers)
-                .labelStyle(.iconOnly)
-                .help("交换两侧文件 (⌘⇧X)")
+            Spacer()
+            if session.isWorking { ProgressView().controlSize(.small) }
+            Text(summary)
+                .font(.callout.monospacedDigit())
+                .foregroundStyle(.secondary)
+            moreMenu
+        }
+        .padding(.horizontal, 12)
+        .frame(height: 44)
+        .background(.bar)
+    }
+
+    private var moreMenu: some View {
+        Menu {
+            Button("保存左侧", action: saveLeft)
+                .keyboardShortcut("s", modifiers: [.command])
+            Button("保存右侧", action: saveRight)
+                .keyboardShortcut("s", modifiers: [.command, .shift])
+            Button("左侧另存为…", action: saveLeftAs)
+            Button("右侧另存为…", action: saveRightAs)
+            Divider()
+            Button("撤销", action: undo)
+            Button("重做", action: redo)
+            Button("交换两侧", action: session.swapBuffers)
                 .keyboardShortcut("x", modifiers: [.command, .shift])
-            if let hunk = session.selectedHunk {
-                Divider().frame(height: 18)
-                Button("复制到右侧", systemImage: "arrow.right") { session.applyHunk(hunk, from: .left) }
-                    .keyboardShortcut(.rightArrow, modifiers: [.command, .option])
-                Button("复制到左侧", systemImage: "arrow.left") { session.applyHunk(hunk, from: .right) }
-                    .keyboardShortcut(.leftArrow, modifiers: [.command, .option])
-                Menu("删除差异块", systemImage: "trash") {
-                    Button("删除左侧块") { session.deleteHunk(hunk, from: .left) }
-                    Button("删除右侧块") { session.deleteHunk(hunk, from: .right) }
-                }
-            }
-            Divider().frame(height: 18)
-            Menu {
+            Menu("比较选项") {
                 Toggle("忽略行尾空白", isOn: Binding(
                     get: { session.options.ignoreTrailingWhitespace },
                     set: { var opts = session.options; opts.ignoreTrailingWhitespace = $0; session.setOptions(opts) }
@@ -48,37 +60,27 @@ struct WorkspaceToolbar: View {
                     get: { session.options.ignoreCase },
                     set: { var opts = session.options; opts.ignoreCase = $0; session.setOptions(opts) }
                 ))
-            } label: {
-                Label("比较选项", systemImage: "slider.horizontal.3")
             }
-            .menuStyle(.borderlessButton)
-            .fixedSize()
-
-            Menu {
+            Menu("批量合并") {
                 Button("全部采纳左侧内容 (→)") { session.applyAllHunks(from: .left) }
                 Button("全部采纳右侧内容 (←)") { session.applyAllHunks(from: .right) }
-            } label: {
-                Label("批量合并", systemImage: "arrow.triangle.merge")
             }
-            .menuStyle(.borderlessButton)
-            .fixedSize()
-            Spacer()
-            if session.isWorking { ProgressView().controlSize(.small) }
-            Text(summary)
-                .font(.callout.monospacedDigit())
-                .foregroundStyle(.secondary)
-            Button("保存左侧", systemImage: "square.and.arrow.down", action: saveLeft)
+            if let hunk = session.selectedHunk {
+                Divider()
+                Button("复制差异块到右侧") { session.applyHunk(hunk, from: .left) }
+                    .keyboardShortcut(.rightArrow, modifiers: [.command, .option])
+                Button("复制差异块到左侧") { session.applyHunk(hunk, from: .right) }
+                    .keyboardShortcut(.leftArrow, modifiers: [.command, .option])
+                Button("删除左侧差异块") { session.deleteHunk(hunk, from: .left) }
+                Button("删除右侧差异块") { session.deleteHunk(hunk, from: .right) }
+            }
+        } label: {
+            Label("更多", systemImage: "ellipsis")
                 .labelStyle(.iconOnly)
-                .help("保存左侧 (⌘S)")
-                .keyboardShortcut("s", modifiers: [.command])
-            Button("保存右侧", systemImage: "square.and.arrow.down.on.square", action: saveRight)
-                .labelStyle(.iconOnly)
-                .help("保存右侧 (⌘⇧S)")
-                .keyboardShortcut("s", modifiers: [.command, .shift])
         }
-        .padding(.horizontal, 12)
-        .frame(height: 44)
-        .background(.bar)
+        .help("更多操作")
+        .menuStyle(.borderlessButton)
+        .fixedSize()
     }
 
     private var summary: String {

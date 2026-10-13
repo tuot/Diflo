@@ -9,7 +9,6 @@ struct ComparisonWorkspaceView: View {
         .right: .start
     ]
     @State private var isDiscardConfirmationPresented = false
-    @State private var hiddenIdenticalBanners: Set<ComparisonSide> = []
 
     var body: some View {
         VStack(spacing: 0) {
@@ -18,7 +17,9 @@ struct ComparisonWorkspaceView: View {
                 session: session,
                 returnToLauncher: requestReturn,
                 saveLeft: { save(.left, saveAs: false) },
-                saveRight: { save(.right, saveAs: false) }
+                saveRight: { save(.right, saveAs: false) },
+                saveLeftAs: { save(.left, saveAs: true) },
+                saveRightAs: { save(.right, saveAs: true) }
             )
             .frame(maxWidth: .infinity)
             .zIndex(10)
@@ -30,42 +31,19 @@ struct ComparisonWorkspaceView: View {
                 BufferHeaderView(
                     buffer: session.leftBuffer,
                     side: .left,
-                    open: { open(.left) },
-                    save: { save(.left, saveAs: false) },
-                    saveAs: { save(.left, saveAs: true) }
+                    open: { open(.left) }
                 )
                 Divider()
                 BufferHeaderView(
                     buffer: session.rightBuffer,
                     side: .right,
-                    open: { open(.right) },
-                    save: { save(.right, saveAs: false) },
-                    saveAs: { save(.right, saveAs: true) }
+                    open: { open(.right) }
                 )
             }
             .frame(height: 46)
             .zIndex(10)
 
             Divider().zIndex(10)
-
-            if session.result?.differenceCount == 0,
-               (!session.leftBuffer.text.isEmpty || !session.rightBuffer.text.isEmpty),
-               hiddenIdenticalBanners.count < 2 {
-                HStack(spacing: 0) {
-                    IdenticalContentBanner(
-                        isHidden: hiddenIdenticalBanners.contains(.left),
-                        hide: { hiddenIdenticalBanners.insert(.left) }
-                    )
-                    Divider()
-                    IdenticalContentBanner(
-                        isHidden: hiddenIdenticalBanners.contains(.right),
-                        hide: { hiddenIdenticalBanners.insert(.right) }
-                    )
-                }
-                .frame(height: 48)
-                .zIndex(10)
-                Divider().zIndex(10)
-            }
 
             // 3. 中间对比工作区：可编辑双栏 + 贝塞尔曲面连线 + Hunk 感知滚动同步
             MeldDualEditorWorkspaceView(
@@ -140,30 +118,5 @@ struct ComparisonWorkspaceView: View {
         alert.addButton(withTitle: "取消")
         alert.addButton(withTitle: "丢弃并打开")
         return alert.runModal() == .alertSecondButtonReturn
-    }
-}
-
-private struct IdenticalContentBanner: View {
-    let isHidden: Bool
-    let hide: () -> Void
-
-    var body: some View {
-        HStack(spacing: 10) {
-            if !isHidden {
-                Image(systemName: "lightbulb.max")
-                    .font(.title2)
-                    .foregroundStyle(.secondary)
-                    .accessibilityHidden(true)
-                Text("文件完全相同")
-                    .font(.callout.weight(.semibold))
-                Spacer()
-                Button("隐藏", action: hide)
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-            }
-        }
-        .padding(.horizontal, 14)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(nsColor: .systemYellow).opacity(isHidden ? 0 : 0.09))
     }
 }

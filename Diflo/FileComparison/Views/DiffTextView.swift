@@ -8,6 +8,7 @@ final class DiffTextView: NSTextView {
     private var textStorageHolder: NSTextStorage?
     private var rowHighlights: [DiffRowPresentation.Highlight] = []
     private var selectedRows: Range<Int>?
+    private var emptyHighlights: [(Int, DiffRowPresentation.Highlight)] = []
     private var lineCount: Int = 1
 
     var placeholderString: String? {
@@ -34,8 +35,13 @@ final class DiffTextView: NSTextView {
         textView.font = NSFont.monospacedSystemFont(ofSize: 12.5, weight: .regular)
         textView.textColor = NSColor.textColor
         textView.insertionPointColor = NSColor.controlAccentColor
-        textView.backgroundColor = .clear
-        textView.drawsBackground = false
+        textView.backgroundColor = .textBackgroundColor
+        textView.drawsBackground = true
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.minimumLineHeight = Self.rowHeight
+        paragraph.maximumLineHeight = Self.rowHeight
+        textView.defaultParagraphStyle = paragraph
+        textView.typingAttributes = [.font: textView.font!, .foregroundColor: NSColor.textColor, .paragraphStyle: paragraph]
         textView.isEditable = true
         textView.isSelectable = true
         textView.allowsUndo = true
@@ -48,11 +54,12 @@ final class DiffTextView: NSTextView {
 
         textView.textContainerInset = NSSize(width: 5, height: Self.verticalInset)
         textView.isVerticallyResizable = true
-        textView.isHorizontallyResizable = false
+        textView.isHorizontallyResizable = true
         textView.autoresizingMask = [.width]
         textView.minSize = NSSize(width: 0, height: 0)
         textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
-        textView.textContainer?.widthTracksTextView = true
+        textView.textContainer?.widthTracksTextView = false
+        textView.textContainer?.containerSize = NSSize(width: 10_000_000, height: CGFloat.greatestFiniteMagnitude)
         textView.placeholderString = side == .left ? "输入或粘贴左侧文本..." : "输入或粘贴右侧文本..."
         let accessibilityName = side == .left ? "左侧文件内容" : "右侧文件内容"
         textView.setAccessibilityIdentifier(accessibilityName)
@@ -75,7 +82,8 @@ final class DiffTextView: NSTextView {
 
         let attributes: [NSAttributedString.Key: Any] = [
             .font: NSFont.monospacedSystemFont(ofSize: 12.5, weight: .regular),
-            .foregroundColor: NSColor.textColor
+            .foregroundColor: NSColor.textColor,
+            .paragraphStyle: defaultParagraphStyle!
         ]
         self.typingAttributes = attributes
 
@@ -122,6 +130,7 @@ final class DiffTextView: NSTextView {
 
     private func updateHighlightsArray(lineCount: Int, hunks: [DiffHunk], side: ComparisonSide, selectedHunkID: DiffHunk.ID?) {
         rowHighlights = Array(repeating: .none, count: max(1, lineCount))
+        emptyHighlights = []
         for hunk in hunks {
             let range = side == .left ? hunk.leftLineRange : hunk.rightLineRange
             let highlight: DiffRowPresentation.Highlight
@@ -130,12 +139,50 @@ final class DiffTextView: NSTextView {
             case .rightOnly: highlight = .insertion
             case .modified: highlight = .modification
             }
+            if range.isEmpty { emptyHighlights.append((range.lowerBound, highlight)) }
             for index in range where index < rowHighlights.count {
                 rowHighlights[index] = highlight
             }
         }
         selectedRows = hunks.first { $0.id == selectedHunkID }.map {
             side == .left ? $0.leftLineRange : $0.rightLineRange
+        }
+    }
+
+    override func drawBackground(in rect: NSRect) {
+        NSGraphicsContext.saveGraphicsState()
+        defer { NSGraphicsContext.restoreGraphicsState() }
+        NSBezierPath(rect: bounds).addClip()
+        super.drawBackground(in: rect)
+        let first = max(0, Int(floor((rect.minY - Self.verticalInset) / Self.rowHeight)))
+        let end = min(rowHighlights.count, Int(ceil((rect.maxY - Self.verticalInset) / Self.rowHeight)))
+        if first < end {
+            for row in first..<end {
+                guard let color = Self.backgroundColor(for: rowHighlights[row], appearance: effectiveAppearance) else { continue }
+                let band = NSRect(x: bounds.minX, y: Self.verticalInset + CGFloat(row) * Self.rowHeight, width: bounds.width, height: Self.rowHeight)
+                color.setFill()
+                band.fill()
+                color.blended(withFraction: 0.25, of: .labelColor)?.setFill()
+                if row == 0 || rowHighlights[row - 1] != rowHighlights[row] {
+                    NSRect(x: band.minX, y: band.minY, width: band.width, height: 0.5).fill()
+                }
+                if row + 1 == rowHighlights.count || rowHighlights[row + 1] != rowHighlights[row] {
+                    NSRect(x: band.minX, y: band.maxY - 0.5, width: band.width, height: 0.5).fill()
+                }
+                if selectedRows?.contains(row) == true {
+                    NSColor.controlAccentColor.setStroke()
+                    let outline = NSBezierPath(rect: band.insetBy(dx: 0.5, dy: 0.5))
+                    outline.lineWidth = 1
+                    outline.stroke()
+                }
+            }
+        }
+        for (line, highlight) in emptyHighlights {
+            let y = Self.verticalInset + CGFloat(line) * Self.rowHeight
+            guard y >= rect.minY - 2, y <= rect.maxY + 2,
+                  let color = Self.backgroundColor(for: highlight, appearance: effectiveAppearance) else { continue }
+            color.setFill()
+            NSRect(x: bounds.minX, y: y - 1, width: bounds.width, height: 2).fill()
         }
     }
 
@@ -206,12 +253,13 @@ final class DiffTextView: NSTextView {
     func resizeDocument(minimumSize: NSSize) {
         guard let scrollView = enclosingScrollView ?? (superview as? NSClipView)?.superview as? NSScrollView else { return }
         let viewportSize = scrollView.contentSize
-        let newWidth = max(viewportSize.width, 200)
         let minHeight = max(minimumSize.height, viewportSize.height, 200)
 
         guard let textContainer, let layoutManager else { return }
         layoutManager.ensureLayout(for: textContainer)
-        let usedHeight = ceil(layoutManager.usedRect(for: textContainer).height + textContainerInset.height * 2)
+        let usedRect = layoutManager.usedRect(for: textContainer)
+        let newWidth = max(viewportSize.width, ceil(usedRect.maxX + textContainerInset.width * 2), 200)
+        let usedHeight = ceil(usedRect.height + textContainerInset.height * 2)
         let neededHeight = Self.verticalInset * 2 + CGFloat(max(1, lineCount)) * Self.rowHeight
         let newHeight = max(minHeight, usedHeight, neededHeight)
 
@@ -221,8 +269,8 @@ final class DiffTextView: NSTextView {
         }
     }
 
-    private func backgroundColor(for highlight: DiffRowPresentation.Highlight) -> NSColor? {
-        let isDark = NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+    static func backgroundColor(for highlight: DiffRowPresentation.Highlight, appearance: NSAppearance) -> NSColor? {
+        let isDark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
         switch highlight {
         case .none:
             return nil
