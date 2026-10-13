@@ -22,6 +22,10 @@ struct ChangeGutterRepresentable: NSViewRepresentable {
 
 
     private func configure(_ view: ChangeGutterView) {
+        view.scrollOffsets = { [weak coordinator] in
+            (Double(coordinator?.leftScrollView?.contentView.bounds.minY ?? 0),
+             Double(coordinator?.rightScrollView?.contentView.bounds.minY ?? 0))
+        }
         view.configure(
             hunks: hunks,
             selectedHunkID: selectedHunkID,

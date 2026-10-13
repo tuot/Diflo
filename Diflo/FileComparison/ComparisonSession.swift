@@ -4,6 +4,7 @@ import Observation
 @MainActor
 @Observable
 final class ComparisonSession {
+    let undoManager = UndoManager()
     private let worker: any ComparisonWorking
     private var comparisonTask: Task<Void, Never>?
     private var comparisonGeneration = 0
@@ -26,6 +27,7 @@ final class ComparisonSession {
     }
 
     func startBlank() {
+        undoManager.removeAllActions()
         comparisonTask?.cancel()
         invalidateLoads()
         result = nil
@@ -34,6 +36,13 @@ final class ComparisonSession {
         selectedHunkID = nil
         errorMessage = nil
         isWorkspacePresented = true
+        scheduleComparison(debounced: false)
+    }
+
+    func startSamples() {
+        startBlank()
+        leftBuffer = EditorBuffer.blank(named: "测试数据 · 左侧").updatingText(ComparisonSamples.left)
+        rightBuffer = EditorBuffer.blank(named: "测试数据 · 右侧").updatingText(ComparisonSamples.right)
         scheduleComparison(debounced: false)
     }
 

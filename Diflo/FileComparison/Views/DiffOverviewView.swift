@@ -9,11 +9,18 @@ final class DiffOverviewView: NSView {
 
     private var viewportProgress: Double = 0
     private var visibleFraction: Double = 1.0
+    private var dragOffset: CGFloat = 0
 
     override var isFlipped: Bool { true }
 
-    private var displayRows: Double {
-        max(Double(totalRows), bounds.height / DiffTextView.rowHeight)
+    private var documentHeight: CGFloat {
+        max(bounds.height, DiffTextView.verticalInset * 2 + CGFloat(totalRows) * DiffTextView.rowHeight)
+    }
+
+    var viewportRect: NSRect {
+        let height = min(bounds.height, max(14, bounds.height * visibleFraction))
+        return NSRect(x: 1, y: (bounds.height - height) * viewportProgress,
+                      width: max(0, bounds.width - 2), height: height)
     }
 
     func configure(
@@ -44,8 +51,8 @@ final class DiffOverviewView: NSView {
         dirtyRect.fill()
 
         for hunk in hunks {
-            let y = Double(hunk.virtualRowRange.lowerBound) / max(1, displayRows) * bounds.height
-            let height = max(3, Double(hunk.virtualRowRange.count) / max(1, displayRows) * bounds.height)
+            let y = (DiffTextView.verticalInset + CGFloat(hunk.rightLineRange.lowerBound) * DiffTextView.rowHeight) / max(1, documentHeight) * bounds.height
+            let height = max(3, CGFloat(hunk.rightLineRange.count) * DiffTextView.rowHeight / max(1, documentHeight) * bounds.height)
             color(for: hunk).setFill()
             NSBezierPath(roundedRect: NSRect(x: 2, y: y, width: bounds.width - 4, height: height), xRadius: 1.5, yRadius: 1.5).fill()
             if hunk.id == selectedHunkID {
@@ -57,10 +64,7 @@ final class DiffOverviewView: NSView {
 
         // Draw visible viewport indicator
         if visibleFraction < 0.99 {
-            let vpHeight = max(14, bounds.height * visibleFraction)
-            let maxTravel = bounds.height - vpHeight
-            let vpY = max(0, min(bounds.height - vpHeight, maxTravel * viewportProgress))
-            let vpRect = NSRect(x: 1, y: vpY, width: bounds.width - 2, height: vpHeight)
+            let vpRect = viewportRect
 
             NSColor.labelColor.withAlphaComponent(0.09).setFill()
             NSBezierPath(roundedRect: vpRect, xRadius: 2, yRadius: 2).fill()
@@ -75,13 +79,19 @@ final class DiffOverviewView: NSView {
 
     override func mouseDown(with event: NSEvent) {
         let point = convert(event.locationInWindow, from: nil)
-        let fraction = max(0, min(1, point.y / max(1, bounds.height)))
-        let row = Int(fraction * displayRows)
-        let hunk = hunks.min {
-            abs($0.virtualRowRange.lowerBound - row) < abs($1.virtualRowRange.lowerBound - row)
-        }
-        select?(hunk?.id)
-        onScrollToProgress?(fraction)
+        let thumb = viewportRect
+        dragOffset = thumb.contains(point) ? point.y - thumb.minY : thumb.height / 2
+        if !thumb.contains(point) { scroll(to: point.y) }
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        scroll(to: convert(event.locationInWindow, from: nil).y)
+    }
+
+    private func scroll(to y: CGFloat) {
+        let travel = bounds.height - viewportRect.height
+        guard travel > 0 else { return }
+        onScrollToProgress?(Double(max(0, min(1, (y - dragOffset) / travel))))
     }
 
     private func color(for hunk: DiffHunk) -> NSColor {

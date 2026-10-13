@@ -17,8 +17,17 @@ final class DualScrollCoordinator: NSObject {
     weak var nativeGutterView: NativeChangeGutterView?
     var onViewportChanged: (() -> Void)?
     private var isSynchronizing = false
+    private var leftHorizontalOffset: CGFloat = 0
+    private var rightHorizontalOffset: CGFloat = 0
 
     func geometryChanged() {
+        if let scroll = rightScrollView, let document = scroll.documentView {
+            let height = max(1, document.bounds.height)
+            let travel = max(0, height - scroll.contentSize.height)
+            viewportProgress = travel > 0 ? scroll.contentView.bounds.minY / travel : 0
+            visibleFraction = min(1, scroll.contentSize.height / height)
+            overviewView?.updateViewport(progress: viewportProgress, visibleFraction: visibleFraction)
+        }
         nativeGutterView?.needsDisplay = true
         onViewportChanged?()
     }
@@ -30,8 +39,12 @@ final class DualScrollCoordinator: NSObject {
     func register(scrollView: NSScrollView, for side: ComparisonSide) {
         if side == .left {
             leftScrollView = scrollView
+            leftOffset = scrollView.contentView.bounds.minY
+            leftHorizontalOffset = scrollView.contentView.bounds.minX
         } else {
             rightScrollView = scrollView
+            rightOffset = scrollView.contentView.bounds.minY
+            rightHorizontalOffset = scrollView.contentView.bounds.minX
         }
         scrollView.contentView.postsBoundsChangedNotifications = true
         NotificationCenter.default.removeObserver(self, name: NSView.boundsDidChangeNotification, object: scrollView.contentView)
@@ -59,9 +72,14 @@ final class DualScrollCoordinator: NSObject {
         let sourceMax = max(0, (source.documentView?.bounds.height ?? 0) - source.contentSize.height)
         let targetMax = max(0, (target.documentView?.bounds.height ?? 0) - target.contentSize.height)
         let sourceY = Double(source.contentView.bounds.minY)
+        let verticalChanged = sourceY != (sourceIsLeft ? leftOffset : rightOffset)
+        let sourceX = source.contentView.bounds.minX
+        let horizontalChanged = sourceX != (sourceIsLeft ? leftHorizontalOffset : rightHorizontalOffset)
 
         let targetY: Double
-        if let sourceEditor = source.documentView as? NativeDiffTextView,
+        if !verticalChanged {
+            targetY = target.contentView.bounds.minY
+        } else if let sourceEditor = source.documentView as? NativeDiffTextView,
            let targetEditor = target.documentView as? NativeDiffTextView {
             sourceEditor.refreshGeometry()
             let center = source.contentView.bounds.midY
@@ -76,15 +94,22 @@ final class DualScrollCoordinator: NSObject {
 
         var targetOrigin = target.contentView.bounds.origin
         targetOrigin.y = CGFloat(targetY)
+        if horizontalChanged {
+            let targetMaxX = max(0, (target.documentView?.bounds.width ?? 0) - target.contentSize.width)
+            targetOrigin.x = min(targetMaxX, max(0, sourceX))
+        }
         target.contentView.scroll(to: targetOrigin)
         target.reflectScrolledClipView(target.contentView)
 
         leftOffset = Double(leftScrollView?.contentView.bounds.minY ?? 0)
         rightOffset = Double(rightScrollView?.contentView.bounds.minY ?? 0)
-        viewportProgress = sourceMax > 0 ? sourceY / sourceMax : 0
-
-        let docHeight = max(1, source.documentView?.bounds.height ?? 1)
-        visibleFraction = min(1.0, source.contentSize.height / docHeight)
+        leftHorizontalOffset = leftScrollView?.contentView.bounds.minX ?? 0
+        rightHorizontalOffset = rightScrollView?.contentView.bounds.minX ?? 0
+        let overviewScroll = rightScrollView ?? source
+        let docHeight = max(1, overviewScroll.documentView?.bounds.height ?? 1)
+        let overviewMax = max(0, docHeight - overviewScroll.contentSize.height)
+        viewportProgress = overviewMax > 0 ? overviewScroll.contentView.bounds.minY / overviewMax : 0
+        visibleFraction = min(1.0, overviewScroll.contentSize.height / docHeight)
 
         (target.documentView as? NativeDiffTextView)?.refreshGeometry()
         geometryChanged()
@@ -152,13 +177,13 @@ final class DualScrollCoordinator: NSObject {
     }
 
     func scrollToProgress(_ progress: Double) {
-        for scrollView in [leftScrollView, rightScrollView].compactMap({ $0 }) {
-            let maxScroll = max(0, (scrollView.documentView?.bounds.height ?? 0) - scrollView.contentSize.height)
-            var origin = scrollView.contentView.bounds.origin
-            origin.y = maxScroll * progress
-            scrollView.contentView.animator().setBoundsOrigin(origin)
-            scrollView.reflectScrolledClipView(scrollView.contentView)
-        }
+        guard let scrollView = rightScrollView ?? leftScrollView else { return }
+        let maxScroll = max(0, (scrollView.documentView?.bounds.height ?? 0) - scrollView.contentSize.height)
+        var origin = scrollView.contentView.bounds.origin
+        origin.y = maxScroll * max(0, min(1, progress))
+        // The normal right-to-left synchronization keeps corresponding content aligned.
+        scrollView.contentView.scroll(to: origin)
+        scrollView.reflectScrolledClipView(scrollView.contentView)
     }
 
     func scrollTo(hunk: DiffHunk) {

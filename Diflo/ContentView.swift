@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ContentView: View {
     @State private var session = ComparisonSession()
+    @State private var didLoadSamples = false
 
     var body: some View {
         Group {
@@ -12,6 +13,12 @@ struct ContentView: View {
             }
         }
         .frame(minWidth: 920, maxWidth: .infinity, minHeight: 600, maxHeight: .infinity)
+        .focusedSceneValue(\.comparisonUndoManager, session.isWorkspacePresented ? session.undoManager : nil)
+        .onAppear {
+            guard !didLoadSamples else { return }
+            didLoadSamples = true
+            session.startSamples()
+        }
         .alert("操作失败", isPresented: errorBinding) {
             Button("好", action: session.dismissError)
         } message: {

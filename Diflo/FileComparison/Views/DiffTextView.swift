@@ -1,15 +1,102 @@
 import AppKit
 
 final class DiffTextView: NSTextView {
-    static let rowHeight: CGFloat = 22.0
+    static let editorFont = NSFont.monospacedSystemFont(ofSize: 14, weight: .regular)
+    static let rowHeight = ceil(NSLayoutManager().defaultLineHeight(for: editorFont)) + 2
     static let verticalInset: CGFloat = 8.0
     static let gutterWidth: CGFloat = 46.0
+
+    static func diffBandRect(for lines: Range<Int>, width: CGFloat, offset: CGFloat = 0) -> NSRect {
+        let y = verticalInset + CGFloat(lines.lowerBound) * rowHeight - offset
+        return NSRect(x: 0, y: lines.isEmpty ? y - 1 : y, width: width,
+                      height: lines.isEmpty ? 2 : CGFloat(lines.count) * rowHeight)
+    }
 
     private var textStorageHolder: NSTextStorage?
     private var rowHighlights: [DiffRowPresentation.Highlight] = []
     private var selectedRows: Range<Int>?
     private var emptyHighlights: [(Int, DiffRowPresentation.Highlight)] = []
     private var lineCount: Int = 1
+    private let localUndoManager = UndoManager()
+    var sharedUndoManager: UndoManager?
+    override var undoManager: UndoManager? { sharedUndoManager ?? localUndoManager }
+    private(set) var lineIndex = TextLineIndex(normalizedText: "")
+    private var indexedText = ""
+    private var decorationHunks: [DiffHunk] = []
+    private var decorationSide: ComparisonSide = .left
+    private var decorationLineCount = 0
+    private let inlineWorker = InlineDiffWorker()
+    private var inlineTask: Task<Void, Never>?
+    private var inlineGeneration = 0
+    private var inlineRanges: [NSRange] = []
+    private var oppositeLines: [String] = []
+    private var inlineInputText: String?
+    private var inlineInputHunks: [DiffHunk] = []
+    private var inlineInputOpposite: [String] = []
+    private var inlineInputSide: ComparisonSide = .left
+    private var inlineVisibleLines: Range<Int>?
+
+    deinit {
+        inlineTask?.cancel()
+        NotificationCenter.default.removeObserver(self)
+    }
+
+    override func viewDidMoveToSuperview() {
+        super.viewDidMoveToSuperview()
+        NotificationCenter.default.removeObserver(self, name: NSView.boundsDidChangeNotification, object: nil)
+        if let clip = enclosingScrollView?.contentView {
+            clip.postsBoundsChangedNotifications = true
+            NotificationCenter.default.addObserver(self, selector: #selector(viewportChanged), name: NSView.boundsDidChangeNotification, object: clip)
+        }
+    }
+
+    @objc private func viewportChanged() { refreshInlineHighlights() }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        inlineVisibleLines = nil
+        refreshInlineHighlights()
+        needsDisplay = true
+    }
+
+    override func didChangeText() {
+        if !hasMarkedText() {
+            synchronizeLineIndex()
+            typingAttributes = baseAttributes
+            inlineVisibleLines = nil
+        }
+        super.didChangeText()
+    }
+
+    private var baseAttributes: [NSAttributedString.Key: Any] {
+        [.font: Self.editorFont, .foregroundColor: NSColor.textColor,
+         .paragraphStyle: defaultParagraphStyle ?? NSParagraphStyle.default]
+    }
+
+    private func synchronizeLineIndex(_ supplied: TextLineIndex? = nil) {
+        let text = string
+        if indexedText != text {
+            indexedText = text
+            lineIndex = supplied ?? TextLineIndex(normalizedText: text)
+        }
+    }
+
+    func applyExternalText(_ text: String, undoable: Bool) {
+        guard string != text, !hasMarkedText() else { return }
+        clearInlineHighlights()
+        let selection = selectedRange()
+        if undoable {
+            let range = NSRange(location: 0, length: (string as NSString).length)
+            guard shouldChangeText(in: range, replacementString: text) else { return }
+            replaceCharacters(in: range, with: text)
+            didChangeText()
+        } else {
+            textStorage?.setAttributedString(NSAttributedString(string: text, attributes: baseAttributes))
+            undoManager?.removeAllActions()
+        }
+        synchronizeLineIndex()
+        setSelectedRange(NSRange(location: min(selection.location, (text as NSString).length), length: 0))
+    }
 
     var placeholderString: String? {
         didSet { needsDisplay = true }
@@ -17,6 +104,35 @@ final class DiffTextView: NSTextView {
 
     override var acceptsFirstResponder: Bool { true }
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    override func becomeFirstResponder() -> Bool {
+        let accepted = super.becomeFirstResponder()
+        needsDisplay = true
+        return accepted
+    }
+
+    override func resignFirstResponder() -> Bool {
+        breakUndoCoalescing()
+        let accepted = super.resignFirstResponder()
+        needsDisplay = true
+        return accepted
+    }
+
+    override func setSelectedRange(_ charRange: NSRange, affinity: NSSelectionAffinity, stillSelecting flag: Bool) {
+        super.setSelectedRange(charRange, affinity: affinity, stillSelecting: flag)
+        needsDisplay = true
+    }
+
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        if window?.firstResponder === self,
+           event.modifierFlags.intersection(.deviceIndependentFlagsMask).subtracting(.shift) == .command,
+           event.charactersIgnoringModifiers?.lowercased() == "z" {
+            if event.modifierFlags.contains(.shift) { undoManager?.redo() }
+            else { undoManager?.undo() }
+            return true
+        }
+        return super.performKeyEquivalent(with: event)
+    }
 
     static func createStandard(side: ComparisonSide) -> DiffTextView {
         let textStorage = NSTextStorage()
@@ -32,7 +148,7 @@ final class DiffTextView: NSTextView {
             textContainer: textContainer
         )
         textView.textStorageHolder = textStorage
-        textView.font = NSFont.monospacedSystemFont(ofSize: 12.5, weight: .regular)
+        textView.font = Self.editorFont
         textView.textColor = NSColor.textColor
         textView.insertionPointColor = NSColor.controlAccentColor
         textView.backgroundColor = .textBackgroundColor
@@ -52,7 +168,8 @@ final class DiffTextView: NSTextView {
         textView.isAutomaticTextReplacementEnabled = false
         textView.isAutomaticSpellingCorrectionEnabled = false
 
-        textView.textContainerInset = NSSize(width: 5, height: Self.verticalInset)
+        textView.textContainerInset = NSSize(width: 0, height: Self.verticalInset)
+        textView.textContainer?.lineFragmentPadding = 0
         textView.isVerticallyResizable = true
         textView.isHorizontallyResizable = true
         textView.autoresizingMask = [.width]
@@ -75,33 +192,21 @@ final class DiffTextView: NSTextView {
         hunks: [DiffHunk],
         side: ComparisonSide,
         selectedHunkID: DiffHunk.ID?,
-        oppositeLines: [String] = []
+        oppositeLines: [String] = [],
+        undoable: Bool = false,
+        lineIndex: TextLineIndex? = nil
     ) {
+        guard !hasMarkedText() else { return }
         self.lineCount = max(1, lineCount)
         updateHighlightsArray(lineCount: self.lineCount, hunks: hunks, side: side, selectedHunkID: selectedHunkID)
 
-        let attributes: [NSAttributedString.Key: Any] = [
-            .font: NSFont.monospacedSystemFont(ofSize: 12.5, weight: .regular),
-            .foregroundColor: NSColor.textColor,
-            .paragraphStyle: defaultParagraphStyle!
-        ]
-        self.typingAttributes = attributes
-
-        if string != text {
-            let selection = selectedRange()
-            textStorage?.setAttributedString(NSAttributedString(string: text, attributes: attributes))
-            setSelectedRange(NSRange(location: min(selection.location, (text as NSString).length), length: 0))
-        } else if let len = textStorage?.length, len > 0 {
-            textStorage?.addAttributes(attributes, range: NSRange(location: 0, length: len))
+        if indexedText != text {
+            applyExternalText(text, undoable: undoable)
+            indexedText = text
+            if let lineIndex { self.lineIndex = lineIndex }
         }
-
-        applyIntraLineHighlights(
-            text: string,
-            hunks: hunks,
-            side: side,
-            selectedHunkID: selectedHunkID,
-            oppositeLines: oppositeLines
-        )
+        self.oppositeLines = oppositeLines
+        refreshInlineHighlights()
 
         let accessibilityName = side == .left ? "左侧文件内容" : "右侧文件内容"
         setAccessibilityIdentifier(accessibilityName)
@@ -116,32 +221,34 @@ final class DiffTextView: NSTextView {
         selectedHunkID: DiffHunk.ID?,
         oppositeLines: [String] = []
     ) {
+        guard !hasMarkedText() else { return }
         self.lineCount = max(1, lineCount)
         updateHighlightsArray(lineCount: self.lineCount, hunks: hunks, side: side, selectedHunkID: selectedHunkID)
-        applyIntraLineHighlights(
-            text: string,
-            hunks: hunks,
-            side: side,
-            selectedHunkID: selectedHunkID,
-            oppositeLines: oppositeLines
-        )
+        synchronizeLineIndex()
+        self.oppositeLines = oppositeLines
+        refreshInlineHighlights()
         needsDisplay = true
     }
 
     private func updateHighlightsArray(lineCount: Int, hunks: [DiffHunk], side: ComparisonSide, selectedHunkID: DiffHunk.ID?) {
-        rowHighlights = Array(repeating: .none, count: max(1, lineCount))
-        emptyHighlights = []
-        for hunk in hunks {
-            let range = side == .left ? hunk.leftLineRange : hunk.rightLineRange
-            let highlight: DiffRowPresentation.Highlight
-            switch hunk.kind {
-            case .leftOnly: highlight = .deletion
-            case .rightOnly: highlight = .insertion
-            case .modified: highlight = .modification
-            }
-            if range.isEmpty { emptyHighlights.append((range.lowerBound, highlight)) }
-            for index in range where index < rowHighlights.count {
-                rowHighlights[index] = highlight
+        if decorationHunks != hunks || decorationSide != side || decorationLineCount != lineCount {
+            decorationHunks = hunks
+            decorationSide = side
+            decorationLineCount = lineCount
+            rowHighlights = Array(repeating: .none, count: max(1, lineCount))
+            emptyHighlights = []
+            for hunk in hunks {
+                let range = side == .left ? hunk.leftLineRange : hunk.rightLineRange
+                let highlight: DiffRowPresentation.Highlight
+                switch hunk.kind {
+                case .leftOnly: highlight = .deletion
+                case .rightOnly: highlight = .insertion
+                case .modified: highlight = .modification
+                }
+                if range.isEmpty { emptyHighlights.append((range.lowerBound, highlight)) }
+                for index in range where index < rowHighlights.count {
+                    rowHighlights[index] = highlight
+                }
             }
         }
         selectedRows = hunks.first { $0.id == selectedHunkID }.map {
@@ -169,85 +276,115 @@ final class DiffTextView: NSTextView {
                 if row + 1 == rowHighlights.count || rowHighlights[row + 1] != rowHighlights[row] {
                     NSRect(x: band.minX, y: band.maxY - 0.5, width: band.width, height: 0.5).fill()
                 }
-                if selectedRows?.contains(row) == true {
-                    NSColor.controlAccentColor.setStroke()
-                    let outline = NSBezierPath(rect: band.insetBy(dx: 0.5, dy: 0.5))
-                    outline.lineWidth = 1
-                    outline.stroke()
-                }
             }
+        }
+        if window?.firstResponder === self {
+            let line = lineIndex.line(containingUTF16Offset: selectedRange().location)
+            let band = Self.diffBandRect(for: line..<(line + 1), width: bounds.width).insetBy(dx: 0, dy: 0.5)
+            if band.intersects(rect) {
+                let dark = effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+                NSColor.systemYellow.withAlphaComponent(dark ? 0.16 : 0.20).setFill()
+                band.fill()
+            }
+        }
+        if let selectedRows, !selectedRows.isEmpty {
+            let block = NSRect(x: bounds.minX, y: Self.verticalInset + CGFloat(selectedRows.lowerBound) * Self.rowHeight,
+                               width: bounds.width, height: CGFloat(selectedRows.count) * Self.rowHeight)
+            NSColor.controlAccentColor.setStroke()
+            let outline = NSBezierPath(rect: block.insetBy(dx: 0.5, dy: 0.5))
+            outline.lineWidth = 1
+            outline.stroke()
         }
         for (line, highlight) in emptyHighlights {
             let y = Self.verticalInset + CGFloat(line) * Self.rowHeight
             guard y >= rect.minY - 2, y <= rect.maxY + 2,
                   let color = Self.backgroundColor(for: highlight, appearance: effectiveAppearance) else { continue }
             color.setFill()
-            NSRect(x: bounds.minX, y: y - 1, width: bounds.width, height: 2).fill()
+            let band = Self.diffBandRect(for: line..<line, width: bounds.width)
+            band.fill()
+            let selected = selectedRows?.isEmpty == true && selectedRows?.lowerBound == line
+            let edgeHeight: CGFloat = selected ? 1 : 0.5
+            (selected ? NSColor.controlAccentColor : color.blended(withFraction: 0.25, of: .labelColor) ?? color).setFill()
+            NSRect(x: band.minX, y: band.minY, width: band.width, height: edgeHeight).fill()
+            NSRect(x: band.minX, y: band.maxY - edgeHeight, width: band.width, height: edgeHeight).fill()
         }
     }
 
-    // MARK: - 字符级差异高亮 (通过 TextKit 直接上色，100% 严丝合缝)
-
-    private func applyIntraLineHighlights(
-        text: String,
-        hunks: [DiffHunk],
-        side: ComparisonSide,
-        selectedHunkID: DiffHunk.ID?,
-        oppositeLines: [String]
-    ) {
-        guard let textStorage else { return }
-        textStorage.removeAttribute(.backgroundColor, range: NSRange(location: 0, length: textStorage.length))
-        guard !oppositeLines.isEmpty else { return }
-
-        let currentLines = text.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
-        guard !currentLines.isEmpty else { return }
-
-        var lineStarts: [Int] = [0]
-        for line in currentLines.dropLast() {
-            lineStarts.append(lineStarts.last! + (line as NSString).length + 1)
+    // Only visible changed lines are refined off the main actor. Decorations never edit text storage.
+    private func clearInlineHighlights() {
+        inlineTask?.cancel()
+        inlineGeneration += 1
+        let document = NSRange(location: 0, length: (string as NSString).length)
+        for range in inlineRanges {
+            let clipped = NSIntersectionRange(range, document)
+            if clipped.length > 0 { layoutManager?.removeTemporaryAttribute(.backgroundColor, forCharacterRange: clipped) }
         }
+        inlineRanges = []
+    }
 
-        let isDark = NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-        let intraBase = isDark
-            ? NSColor(red: 0x24 / 255.0, green: 0x52 / 255.0, blue: 0x7e / 255.0, alpha: 1.0)
-            : NSColor(red: 0x8a / 255.0, green: 0xc2 / 255.0, blue: 0xff / 255.0, alpha: 1.0)
-
-        for hunk in hunks where hunk.kind == .modified {
-            let lineCount = min(hunk.leftLineRange.count, hunk.rightLineRange.count)
-            let isSelected = hunk.id == selectedHunkID
-            let intraColor = intraBase.withAlphaComponent(isSelected ? 0.95 : 0.80)
-
-            for i in 0..<lineCount {
-                let leftIdx = hunk.leftLineRange.lowerBound + i
-                let rightIdx = hunk.rightLineRange.lowerBound + i
-
-                let leftLine = side == .left
-                    ? (leftIdx < currentLines.count ? currentLines[leftIdx] : "")
-                    : (leftIdx < oppositeLines.count ? oppositeLines[leftIdx] : "")
-                let rightLine = side == .left
-                    ? (rightIdx < oppositeLines.count ? oppositeLines[rightIdx] : "")
-                    : (rightIdx < currentLines.count ? currentLines[rightIdx] : "")
-
-                let (leftRanges, rightRanges) = IntraLineDiffEngine.diff(left: leftLine, right: rightLine)
-                let ranges = side == .left ? leftRanges : rightRanges
-                let currentIdx = side == .left ? leftIdx : rightIdx
-
-                guard currentIdx < lineStarts.count else { continue }
-                let lineStart = lineStarts[currentIdx]
-
-                for range in ranges {
-                    let docRange = NSRange(location: lineStart + range.location, length: range.length)
-                    if docRange.location + docRange.length <= textStorage.length {
-                        textStorage.addAttribute(.backgroundColor, value: intraColor, range: docRange)
-                    }
+    func refreshInlineHighlights() {
+        guard !hasMarkedText() else { inlineVisibleLines = nil; return }
+        let viewport = visibleRect
+        guard viewport.minY.isFinite, viewport.maxY.isFinite, Self.rowHeight > 0 else { return }
+        let first = Int(min(CGFloat(lineIndex.lines.count), max(0, floor((viewport.minY - Self.verticalInset) / Self.rowHeight))))
+        let end = Int(min(CGFloat(lineIndex.lines.count), max(CGFloat(first), ceil((viewport.maxY - Self.verticalInset) / Self.rowHeight))))
+        let visible = first..<end
+        let text = indexedText
+        guard inlineVisibleLines != visible || inlineInputText != text || inlineInputHunks != decorationHunks ||
+              inlineInputSide != decorationSide || inlineInputOpposite != oppositeLines else { return }
+        clearInlineHighlights()
+        inlineVisibleLines = visible
+        inlineInputText = text
+        inlineInputHunks = decorationHunks
+        inlineInputOpposite = oppositeLines
+        inlineInputSide = decorationSide
+        let blocks = decorationHunks.filter { $0.kind == .modified && (decorationSide == .left ? $0.leftLineRange : $0.rightLineRange).overlaps(visible) }
+        guard !blocks.isEmpty, !oppositeLines.isEmpty else { return }
+        let generation = inlineGeneration
+        let index = lineIndex
+        let opposite = oppositeLines
+        let side = decorationSide
+        let worker = inlineWorker
+        inlineTask = Task { [weak self] in
+            var ranges: [NSRange] = []
+            for block in blocks {
+                let current = side == .left ? block.leftLineRange : block.rightLineRange
+                for line in max(current.lowerBound, visible.lowerBound)..<min(current.upperBound, visible.upperBound) {
+                    guard !Task.isCancelled else { return }
+                    let otherLine = (side == .left ? block.rightLineRange.lowerBound : block.leftLineRange.lowerBound) + line - current.lowerBound
+                    let otherRange = side == .left ? block.rightLineRange : block.leftLineRange
+                    guard otherRange.contains(otherLine), index.lines.indices.contains(line), opposite.indices.contains(otherLine) else { continue }
+                    let ownText = index.lines[line], otherText = opposite[otherLine]
+                    guard let result = try? await worker.compare(left: side == .left ? ownText : otherText, right: side == .right ? ownText : otherText) else { return }
+                    let changes = side == .left ? result.leftRanges : result.rightRanges
+                    ranges += changes.map { NSRange(location: index.utf16Starts[line] + $0.location, length: $0.length) }
                 }
             }
+            guard let self, !Task.isCancelled, self.inlineGeneration == generation, self.string == text else { return }
+            guard !self.hasMarkedText() else { self.inlineVisibleLines = nil; return }
+            let isDark = self.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            let color = isDark ? NSColor(red: 0.14, green: 0.32, blue: 0.49, alpha: 0.9) : NSColor(red: 0.54, green: 0.76, blue: 1, alpha: 0.65)
+            for range in ranges where NSMaxRange(range) <= index.utf16Count {
+                self.layoutManager?.addTemporaryAttribute(.backgroundColor, value: color, forCharacterRange: range)
+            }
+            self.inlineRanges = ranges
+            self.needsDisplay = true
         }
     }
 
     override func mouseDown(with event: NSEvent) {
         window?.makeFirstResponder(self)
         super.mouseDown(with: event)
+    }
+
+    func fittedInsertionPointRect(_ rect: NSRect) -> NSRect {
+        let fontHeight = ceil((layoutManager ?? NSLayoutManager()).defaultLineHeight(for: font ?? Self.editorFont))
+        let height = min(rect.height, fontHeight)
+        return NSRect(x: rect.minX, y: rect.midY - height / 2, width: rect.width, height: height)
+    }
+
+    override func drawInsertionPoint(in rect: NSRect, color: NSColor, turnedOn flag: Bool) {
+        super.drawInsertionPoint(in: fittedInsertionPointRect(rect), color: color, turnedOn: flag)
     }
 
     func resizeDocument(minimumSize: NSSize) {
@@ -267,6 +404,7 @@ final class DiffTextView: NSTextView {
         if frame != targetFrame {
             frame = targetFrame
         }
+        refreshInlineHighlights()
     }
 
     static func backgroundColor(for highlight: DiffRowPresentation.Highlight, appearance: NSAppearance) -> NSColor? {
@@ -277,15 +415,15 @@ final class DiffTextView: NSTextView {
         case .insertion:
             return isDark
                 ? NSColor(red: 0x12 / 255.0, green: 0x38 / 255.0, blue: 0x06 / 255.0, alpha: 0.85)
-                : NSColor(red: 0xd0 / 255.0, green: 0xff / 255.0, blue: 0xa3 / 255.0, alpha: 0.70)
+                : NSColor(red: 0xd0 / 255.0, green: 0xff / 255.0, blue: 0xa3 / 255.0, alpha: 0.45)
         case .deletion:
             return isDark
                 ? NSColor(red: 0x7a / 255.0, green: 0x2a / 255.0, blue: 0x28 / 255.0, alpha: 0.85)
-                : NSColor(red: 0xff / 255.0, green: 0xa5 / 255.0, blue: 0xa3 / 255.0, alpha: 0.70)
+                : NSColor(red: 0xff / 255.0, green: 0xa5 / 255.0, blue: 0xa3 / 255.0, alpha: 0.45)
         case .modification:
             return isDark
                 ? NSColor(red: 0x00 / 255.0, green: 0x32 / 255.0, blue: 0x66 / 255.0, alpha: 0.85)
-                : NSColor(red: 0xbd / 255.0, green: 0xdd / 255.0, blue: 0xff / 255.0, alpha: 0.70)
+                : NSColor(red: 0xbd / 255.0, green: 0xdd / 255.0, blue: 0xff / 255.0, alpha: 0.45)
         }
     }
 }

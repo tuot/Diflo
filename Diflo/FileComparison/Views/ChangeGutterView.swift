@@ -1,6 +1,8 @@
 import AppKit
 
 final class ChangeGutterView: NSView {
+    static let preferredWidth: CGFloat = 88
+    var scrollOffsets: (() -> (left: Double, right: Double))?
     private var hunks: [DiffHunk] = []
     private var selectedHunkID: DiffHunk.ID?
     private var leftOffset: Double = 0
@@ -11,6 +13,34 @@ final class ChangeGutterView: NSView {
     private var trackingArea: NSTrackingArea?
     private var hoveredHunkID: DiffHunk.ID?
     private var hoveredButtonSide: ComparisonSide?
+    private var accessibleButtons: [String: MergeAccessibilityElement] = [:]
+
+    override func isAccessibilityElement() -> Bool { true }
+    override func accessibilityRole() -> NSAccessibility.Role? { .group }
+    override func accessibilityLabel() -> String? { "差异合并" }
+    override func accessibilityChildren() -> [Any]? {
+        var children: [MergeAccessibilityElement] = []
+        var keys = Set<String>()
+        for hunk in hunks {
+            for button in mergeButtons(for: hunk) where button.rect.intersects(bounds) {
+                let key = "\(hunk.id)-\(button.source)"
+                keys.insert(key)
+                let element = accessibleButtons[key] ?? MergeAccessibilityElement()
+                element.setAccessibilityParent(self)
+                element.setAccessibilityRole(.button)
+                element.setAccessibilityEnabled(true)
+                element.setAccessibilityLabel(button.source == .left ? "采纳左侧内容到右侧" : "采纳右侧内容到左侧")
+                element.setAccessibilityFrameInParentSpace(button.rect)
+                element.action = { [weak self] in
+                    self?.apply?(hunk, button.source)
+                }
+                accessibleButtons[key] = element
+                children.append(element)
+            }
+        }
+        accessibleButtons = accessibleButtons.filter { keys.contains($0.key) }
+        return children
+    }
 
     override var isFlipped: Bool { true }
 
@@ -57,16 +87,12 @@ final class ChangeGutterView: NSView {
         defer { NSGraphicsContext.restoreGraphicsState() }
         // AppKit may invalidate an ancestor's entire area; never paint over the editors.
         NSBezierPath(rect: bounds).addClip()
-        NSColor.controlBackgroundColor.setFill()
+        NSColor.textBackgroundColor.setFill()
         dirtyRect.fill()
 
-        NSColor.separatorColor.setFill()
-        NSBezierPath.fill(NSRect(x: 0, y: dirtyRect.minY, width: 1, height: dirtyRect.height))
-        NSBezierPath.fill(NSRect(x: bounds.maxX - 1, y: dirtyRect.minY, width: 1, height: dirtyRect.height))
-
         for hunk in hunks {
-            let leftRect = lineRect(hunk.leftLineRange, offset: leftOffset)
-            let rightRect = lineRect(hunk.rightLineRange, offset: rightOffset)
+            let leftRect = connectionBand(for: hunk, side: .left)
+            let rightRect = connectionBand(for: hunk, side: .right)
 
             // Viewport culling to maintain 60fps on large files
             if max(leftRect.maxY, rightRect.maxY) < bounds.minY - 40 ||
@@ -80,20 +106,30 @@ final class ChangeGutterView: NSView {
             let hunkColor = color(for: hunk)
 
             let highlight: DiffRowPresentation.Highlight = hunk.kind == .modified ? .modification : (hunk.kind == .leftOnly ? .deletion : .insertion)
-            DiffTextView.backgroundColor(for: highlight, appearance: effectiveAppearance)?.setFill()
+            let fill = DiffTextView.backgroundColor(for: highlight, appearance: effectiveAppearance) ?? hunkColor
+            fill.setFill()
             path.fill()
 
-            hunkColor.withAlphaComponent(isSelected ? 0.85 : 0.5).setStroke()
-            path.lineWidth = isSelected ? 1.5 : 1.0
-            path.stroke()
+            let outline = NSBezierPath()
+            let edgeWidth: CGFloat = isSelected ? 1 : 0.5
+            let inset = edgeWidth / 2
+            for edge in [(leftRect.minY + inset, rightRect.minY + inset), (leftRect.maxY - inset, rightRect.maxY - inset)] {
+                outline.move(to: NSPoint(x: bounds.minX, y: edge.0))
+                outline.curve(to: NSPoint(x: bounds.maxX, y: edge.1),
+                              controlPoint1: NSPoint(x: bounds.midX, y: edge.0),
+                              controlPoint2: NSPoint(x: bounds.midX, y: edge.1))
+            }
+            (isSelected ? NSColor.controlAccentColor : fill.blended(withFraction: 0.25, of: .labelColor) ?? hunkColor).setStroke()
+            outline.lineWidth = edgeWidth
+            outline.stroke()
 
-            drawActionButtons(for: hunk, leftRect: leftRect, rightRect: rightRect)
+            drawActionButtons(for: hunk)
         }
     }
 
     private func bezierPath(for hunk: DiffHunk) -> NSBezierPath {
-        let leftRect = lineRect(hunk.leftLineRange, offset: leftOffset)
-        let rightRect = lineRect(hunk.rightLineRange, offset: rightOffset)
+        let leftRect = connectionBand(for: hunk, side: .left)
+        let rightRect = connectionBand(for: hunk, side: .right)
 
         let path = NSBezierPath()
         path.move(to: NSPoint(x: 0, y: leftRect.minY))
@@ -118,16 +154,9 @@ final class ChangeGutterView: NSView {
         var foundSide: ComparisonSide?
 
         for hunk in hunks {
-            let leftBtn = leftButtonRect(centerY: lineRect(hunk.leftLineRange, offset: leftOffset).midY)
-            let rightBtn = rightButtonRect(centerY: lineRect(hunk.rightLineRange, offset: rightOffset).midY)
-
-            if leftBtn.contains(point) {
+            if let button = mergeButtons(for: hunk).first(where: { $0.rect.contains(point) }) {
                 foundHunkID = hunk.id
-                foundSide = .right // clicking left button applies from right
-                break
-            } else if rightBtn.contains(point) {
-                foundHunkID = hunk.id
-                foundSide = .left // clicking right button applies from left
+                foundSide = button.source
                 break
             } else if bezierPath(for: hunk).contains(point) {
                 foundHunkID = hunk.id
@@ -144,6 +173,7 @@ final class ChangeGutterView: NSView {
         if foundHunkID != hoveredHunkID || foundSide != hoveredButtonSide {
             hoveredHunkID = foundHunkID
             hoveredButtonSide = foundSide
+            toolTip = foundSide.map { $0 == .left ? "采纳左侧内容 →" : "← 采纳右侧内容" }
             needsDisplay = true
         }
     }
@@ -153,6 +183,7 @@ final class ChangeGutterView: NSView {
         if hoveredHunkID != nil || hoveredButtonSide != nil {
             hoveredHunkID = nil
             hoveredButtonSide = nil
+            toolTip = nil
             needsDisplay = true
         }
     }
@@ -160,16 +191,8 @@ final class ChangeGutterView: NSView {
     override func mouseDown(with event: NSEvent) {
         let point = convert(event.locationInWindow, from: nil)
         for hunk in hunks {
-            let leftBtn = leftButtonRect(centerY: lineRect(hunk.leftLineRange, offset: leftOffset).midY)
-            let rightBtn = rightButtonRect(centerY: lineRect(hunk.rightLineRange, offset: rightOffset).midY)
-
-            if leftBtn.contains(point) {
-                select?(hunk.id)
-                apply?(hunk, .right)
-                return
-            } else if rightBtn.contains(point) {
-                select?(hunk.id)
-                apply?(hunk, .left)
+            if let button = mergeButtons(for: hunk).first(where: { $0.rect.contains(point) }) {
+                apply?(hunk, button.source)
                 return
             } else if bezierPath(for: hunk).contains(point) {
                 select?(hunk.id)
@@ -179,69 +202,53 @@ final class ChangeGutterView: NSView {
         select?(nil)
     }
 
-    private func lineRect(_ range: Range<Int>, offset: Double) -> NSRect {
-        if range.isEmpty {
-            let center = DiffTextView.verticalInset + Double(range.lowerBound) * DiffTextView.rowHeight - offset
-            return NSRect(x: 0, y: center - 1.5, width: bounds.width, height: 3)
-        } else {
-            let start = DiffTextView.verticalInset + Double(range.lowerBound) * DiffTextView.rowHeight - offset
-            let height = DiffTextView.rowHeight * Double(range.count)
-            return NSRect(x: 0, y: start, width: bounds.width, height: height)
+    func connectionBand(for hunk: DiffHunk, side: ComparisonSide) -> NSRect {
+        let offsets = scrollOffsets?() ?? (leftOffset, rightOffset)
+        return DiffTextView.diffBandRect(for: side == .left ? hunk.leftLineRange : hunk.rightLineRange,
+                                        width: bounds.width, offset: CGFloat(side == .left ? offsets.0 : offsets.1))
+    }
+
+    private func mergeButtons(for hunk: DiffHunk) -> [(source: ComparisonSide, rect: NSRect)] {
+        var buttons: [(ComparisonSide, NSRect)] = []
+        if !hunk.leftLineRange.isEmpty {
+            let y = connectionBand(for: hunk, side: .left).minY
+            buttons.append((.left, NSRect(x: bounds.minX + 2, y: y, width: 22, height: DiffTextView.rowHeight)))
+        }
+        if !hunk.rightLineRange.isEmpty {
+            let y = connectionBand(for: hunk, side: .right).minY
+            buttons.append((.right, NSRect(x: bounds.maxX - 24, y: y, width: 22, height: DiffTextView.rowHeight)))
+        }
+        return buttons
+    }
+
+    private func drawActionButtons(for hunk: DiffHunk) {
+        for button in mergeButtons(for: hunk) {
+            drawButton(rect: button.rect, source: button.source,
+                       isHovered: hunk.id == hoveredHunkID && hoveredButtonSide == button.source,
+                       tintColor: color(for: hunk))
         }
     }
 
-    private func leftButtonRect(centerY: Double) -> NSRect {
-        NSRect(x: 6, y: centerY - 10, width: 20, height: 20)
-    }
-
-    private func rightButtonRect(centerY: Double) -> NSRect {
-        NSRect(x: bounds.maxX - 26, y: centerY - 10, width: 20, height: 20)
-    }
-
-    private func drawActionButtons(for hunk: DiffHunk, leftRect: NSRect, rightRect: NSRect) {
-        let leftBtn = leftButtonRect(centerY: leftRect.midY)
-        let rightBtn = rightButtonRect(centerY: rightRect.midY)
-        let hunkColor = color(for: hunk)
-
-        // Draw left button (←: copy right to left)
-        drawButton(
-            rect: leftBtn,
-            arrow: "←",
-            isHovered: hunk.id == hoveredHunkID && hoveredButtonSide == .right,
-            tintColor: hunkColor
-        )
-
-        // Draw right button (→: copy left to right)
-        drawButton(
-            rect: rightBtn,
-            arrow: "→",
-            isHovered: hunk.id == hoveredHunkID && hoveredButtonSide == .left,
-            tintColor: hunkColor
-        )
-    }
-
-    private func drawButton(rect: NSRect, arrow: String, isHovered: Bool, tintColor: NSColor) {
-        let path = NSBezierPath(roundedRect: rect.insetBy(dx: 1, dy: 1), xRadius: 2, yRadius: 2)
+    private func drawButton(rect: NSRect, source: ComparisonSide, isHovered: Bool, tintColor: NSColor) {
         if isHovered {
-            tintColor.withAlphaComponent(0.30).setFill()
-            path.fill()
-            tintColor.setStroke()
-            path.lineWidth = 1.5
-            path.stroke()
+            tintColor.withAlphaComponent(0.18).setFill()
+            NSBezierPath(roundedRect: rect.insetBy(dx: 1, dy: 1), xRadius: 3, yRadius: 3).fill()
         }
-
-        let font = NSFont.systemFont(ofSize: 11, weight: .bold)
-        let attributes: [NSAttributedString.Key: Any] = [
-            .font: font,
-            .foregroundColor: isHovered ? tintColor : NSColor.labelColor
-        ]
-        let str = NSString(string: arrow)
-        let size = str.size(withAttributes: attributes)
-        let origin = NSPoint(
-            x: rect.midX - size.width / 2.0,
-            y: rect.midY - size.height / 2.0
-        )
-        str.draw(at: origin, withAttributes: attributes)
+        NSGraphicsContext.saveGraphicsState()
+        defer { NSGraphicsContext.restoreGraphicsState() }
+        let transform = NSAffineTransform()
+        transform.translateX(by: rect.midX, yBy: rect.midY)
+        transform.scaleX(by: source == .left ? 1 : -1, yBy: 1)
+        transform.concat()
+        let arrow = NSBezierPath()
+        arrow.move(to: NSPoint(x: -6, y: -1.5))
+        for point in [NSPoint(x: 0, y: -1.5), NSPoint(x: 0, y: -5), NSPoint(x: 6, y: 0),
+                      NSPoint(x: 0, y: 5), NSPoint(x: 0, y: 1.5), NSPoint(x: -6, y: 1.5)] {
+            arrow.line(to: point)
+        }
+        arrow.close()
+        (isHovered ? tintColor : NSColor.labelColor).setFill()
+        arrow.fill()
     }
 
     private func color(for hunk: DiffHunk) -> NSColor {
@@ -260,5 +267,14 @@ final class ChangeGutterView: NSView {
                 ? NSColor(red: 0x00 / 255.0, green: 0x53 / 255.0, blue: 0xa6 / 255.0, alpha: 1.0)
                 : NSColor(red: 0x65 / 255.0, green: 0xb2 / 255.0, blue: 0xff / 255.0, alpha: 1.0)
         }
+    }
+}
+
+private final class MergeAccessibilityElement: NSAccessibilityElement {
+    var action: (() -> Void)?
+    override func accessibilityPerformPress() -> Bool {
+        guard let action else { return false }
+        action()
+        return true
     }
 }

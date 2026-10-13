@@ -57,7 +57,9 @@ struct MeldDualEditorWorkspaceView: View {
                 selectedHunkID: session.selectedHunkID,
                 coordinator: scrollCoordinator,
                 onEdit: { session.edit(.left, text: $0) },
-                onCursorChanged: { onCursorChanged(.left, $0) }
+                onCursorChanged: { onCursorChanged(.left, $0) },
+                onTextEdit: { session.edit(.left, edit: $0) },
+                sharedUndoManager: session.undoManager
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
@@ -69,7 +71,7 @@ struct MeldDualEditorWorkspaceView: View {
                 onSelectHunk: { session.selectHunk($0) },
                 onApplyHunk: { hunk, side in session.applyHunk(hunk, from: side) }
             )
-            .frame(width: 52).frame(maxHeight: .infinity)
+            .frame(width: ChangeGutterView.preferredWidth).frame(maxHeight: .infinity)
 
             // 右侧编辑器 (NSTextView + 一体化装订线 + 行号 + 差异高亮)
             SingleDiffTextView(
@@ -80,7 +82,9 @@ struct MeldDualEditorWorkspaceView: View {
                 selectedHunkID: session.selectedHunkID,
                 coordinator: scrollCoordinator,
                 onEdit: { session.edit(.right, text: $0) },
-                onCursorChanged: { onCursorChanged(.right, $0) }
+                onCursorChanged: { onCursorChanged(.right, $0) },
+                onTextEdit: { session.edit(.right, edit: $0) },
+                sharedUndoManager: session.undoManager
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
@@ -89,12 +93,12 @@ struct MeldDualEditorWorkspaceView: View {
             // 右侧 Overview 缩略图
             DiffOverviewRepresentable(
                 hunks: session.result?.hunks ?? [],
-                totalRows: max(session.leftBuffer.lineCount, session.rightBuffer.lineCount, 1),
+                totalRows: max(session.rightBuffer.lineCount, 1),
                 selectedHunkID: session.selectedHunkID,
                 coordinator: scrollCoordinator,
                 onSelectHunk: { session.selectHunk($0) }
             )
-            .frame(width: 14).frame(maxHeight: .infinity)
+            .frame(width: 12).frame(maxHeight: .infinity)
         }
     }
 }

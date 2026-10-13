@@ -38,19 +38,26 @@ struct SingleDiffTextView: NSViewRepresentable {
     let coordinator: DualScrollCoordinator
     let onEdit: (String) -> Void
     let onCursorChanged: (CursorPosition) -> Void
+    var onTextEdit: ((TextEdit) -> Void)? = nil
+    var sharedUndoManager: UndoManager? = nil
 
     func makeCoordinator() -> ViewCoordinator {
         ViewCoordinator(self)
     }
 
     func makeNSView(context: Context) -> DiffEditorContainerView {
-        let scrollView = NSScrollView()
+        let scrollView = DiffOverlayScrollView()
         let textView = DiffTextView.createStandard(side: side)
-        let rulerView = LineNumberRulerView(scrollView: scrollView, side: side)
+        textView.sharedUndoManager = sharedUndoManager
 
         scrollView.documentView = textView
         scrollView.hasVerticalScroller = true
         scrollView.hasHorizontalScroller = true
+        scrollView.verticalScroller = HoverScroller(frame: NSRect(x: 0, y: 0, width: 12, height: 200))
+        scrollView.horizontalScroller = HoverScroller(frame: NSRect(x: 0, y: 0, width: 200, height: 12))
+        scrollView.scrollerStyle = .overlay
+        scrollView.verticalScrollElasticity = .none
+        scrollView.horizontalScrollElasticity = .none
         scrollView.autohidesScrollers = true
         scrollView.drawsBackground = false
         scrollView.backgroundColor = .clear
@@ -59,14 +66,13 @@ struct SingleDiffTextView: NSViewRepresentable {
         let placeholder = side == .left ? "输入或粘贴左侧文本..." : "输入或粘贴右侧文本..."
         let containerView = DiffEditorContainerView(
             scrollView: scrollView,
-            lineNumberView: rulerView,
             placeholder: placeholder
         )
+        containerView.onLayout = { coordinator.geometryChanged() }
 
         textView.delegate = context.coordinator
         context.coordinator.textView = textView
         context.coordinator.scrollView = scrollView
-        context.coordinator.rulerView = rulerView
         context.coordinator.containerView = containerView
 
         coordinator.register(scrollView: scrollView, for: side)
@@ -107,9 +113,15 @@ struct SingleDiffTextView: NSViewRepresentable {
         var parent: SingleDiffTextView
         weak var textView: DiffTextView?
         weak var scrollView: NSScrollView?
-        weak var rulerView: LineNumberRulerView?
         weak var containerView: DiffEditorContainerView?
         private var isInternalUpdating = false
+        private var applyingExternal = false
+        private var documentID: UUID?
+        private var revision = 0
+        private var lastCommittedText = ""
+        private var pendingEdit: TextEdit?
+        private var lastCursor: CursorPosition?
+        private var deferredExternalUpdate = false
 
         init(_ parent: SingleDiffTextView) {
             self.parent = parent
@@ -122,7 +134,19 @@ struct SingleDiffTextView: NSViewRepresentable {
             selectedHunkID: DiffHunk.ID?
         ) {
             guard let textView else { return }
+            guard !textView.hasMarkedText() else {
+                deferredExternalUpdate = deferredExternalUpdate || documentID != buffer.documentID || revision != buffer.revision
+                containerView?.setPlaceholderHidden(!textView.string.isEmpty)
+                return
+            }
 
+            let isNewDocument = documentID != buffer.documentID
+            if isNewDocument {
+                textView.undoManager?.removeAllActions()
+                pendingEdit = nil
+                lastCursor = nil
+            }
+            applyingExternal = true
             if !isInternalUpdating {
                 textView.configure(
                     text: buffer.text,
@@ -130,7 +154,9 @@ struct SingleDiffTextView: NSViewRepresentable {
                     hunks: hunks,
                     side: parent.side,
                     selectedHunkID: selectedHunkID,
-                    oppositeLines: oppositeLines
+                    oppositeLines: oppositeLines,
+                    undoable: !isNewDocument && revision != buffer.revision,
+                    lineIndex: buffer.lineIndex
                 )
             } else {
                 textView.updateDiffHighlights(
@@ -142,21 +168,62 @@ struct SingleDiffTextView: NSViewRepresentable {
                 )
             }
 
-            rulerView?.configure(lineCount: buffer.lineCount, hunks: hunks)
+            applyingExternal = false
+            deferredExternalUpdate = false
+            documentID = buffer.documentID
+            revision = buffer.revision
+            lastCommittedText = textView.string
             containerView?.setPlaceholderHidden(!buffer.text.isEmpty)
             textView.resizeDocument(minimumSize: scrollView?.contentSize ?? .zero)
+            Task { @MainActor [weak self] in
+                guard let self, let editor = self.textView else { return }
+                self.updateCursorPosition(in: editor)
+            }
         }
 
         // MARK: - NSTextViewDelegate
 
+        func textView(_ textView: NSTextView, shouldChangeTextIn affectedCharRange: NSRange, replacementString: String?) -> Bool {
+            guard !applyingExternal, !textView.hasMarkedText(), let replacementString else { return true }
+            let normalized = LineParser.normalize(replacementString)
+            if normalized != replacementString {
+                textView.insertText(normalized, replacementRange: affectedCharRange)
+                return false
+            }
+            pendingEdit = TextEdit(range: affectedCharRange, replacement: replacementString, baseRevision: revision)
+            return true
+        }
+
         func textDidChange(_ notification: Notification) {
-            guard let textView else { return }
-            isInternalUpdating = true
+            guard let textView, !applyingExternal else { return }
+            containerView?.setPlaceholderHidden(!textView.string.isEmpty)
+            guard !textView.hasMarkedText() else { pendingEdit = nil; return }
+            // A file or merge received during composition must not be overwritten by the old draft.
+            if deferredExternalUpdate {
+                pendingEdit = nil
+                configure(buffer: parent.buffer, oppositeLines: parent.oppositeLines, hunks: parent.hunks, selectedHunkID: parent.selectedHunkID)
+                return
+            }
             let newText = textView.string
-            parent.onEdit(newText)
-            containerView?.setPlaceholderHidden(!newText.isEmpty)
+            guard newText != lastCommittedText else { pendingEdit = nil; return }
+            isInternalUpdating = true
+            if let pendingEdit, let onTextEdit = parent.onTextEdit,
+               NSMaxRange(pendingEdit.range) <= (lastCommittedText as NSString).length,
+               (lastCommittedText as NSString).replacingCharacters(in: pendingEdit.range, with: pendingEdit.replacement) == newText {
+                onTextEdit(pendingEdit)
+            } else {
+                parent.onEdit(newText)
+            }
+            pendingEdit = nil
+            revision += 1
+            lastCommittedText = newText
             updateCursorPosition(in: textView)
             isInternalUpdating = false
+        }
+
+        func textDidEndEditing(_ notification: Notification) {
+            guard let textView, !textView.hasMarkedText(), textView.string != parent.buffer.text else { return }
+            textDidChange(notification)
         }
 
         func textViewDidChangeSelection(_ notification: Notification) {
@@ -164,59 +231,49 @@ struct SingleDiffTextView: NSViewRepresentable {
             updateCursorPosition(in: textView)
         }
 
-        private func updateCursorPosition(in textView: NSTextView) {
-            let selectedLocation = textView.selectedRange().location
+        private func updateCursorPosition(in textView: DiffTextView) {
+            guard !applyingExternal else { return }
             let text = textView.string as NSString
-            let safeLocation = min(selectedLocation, text.length)
-
-            var line = 1
-            var col = 1
-            var idx = 0
-            while idx < safeLocation {
-                if text.character(at: idx) == 0x0A {
-                    line += 1
-                    col = 1
-                } else {
-                    col += 1
-                }
-                idx += 1
-            }
-            parent.onCursorChanged(CursorPosition(line: line, column: col))
+            let location = min(textView.selectedRange().location, text.length)
+            let index = textView.lineIndex
+            let line = index.line(containingUTF16Offset: location)
+            let start = index.utf16Starts.indices.contains(line) ? index.utf16Starts[line] : 0
+            let prefix = text.substring(with: NSRange(location: min(start, location), length: max(0, location - start)))
+            let cursor = CursorPosition(line: line + 1, column: prefix.count + 1)
+            guard cursor != lastCursor else { return }
+            lastCursor = cursor
+            parent.onCursorChanged(cursor)
         }
     }
 }
 
 final class DiffEditorContainerView: NSView {
+    var onLayout: (() -> Void)?
     let scrollView: NSScrollView
     private let placeholderLabel: NSTextField
 
     override func layout() {
         super.layout()
         (scrollView.documentView as? DiffTextView)?.resizeDocument(minimumSize: scrollView.contentSize)
+        onLayout?()
     }
 
-    init(scrollView: NSScrollView, lineNumberView: NSView, placeholder: String) {
+    init(scrollView: NSScrollView, placeholder: String) {
         self.scrollView = scrollView
         self.placeholderLabel = NSTextField(labelWithString: placeholder)
         super.init(frame: .zero)
-        lineNumberView.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(lineNumberView)
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         addSubview(scrollView)
         placeholderLabel.translatesAutoresizingMaskIntoConstraints = false
-        placeholderLabel.font = NSFont.monospacedSystemFont(ofSize: 12.5, weight: .regular)
+        placeholderLabel.font = DiffTextView.editorFont
         placeholderLabel.textColor = .placeholderTextColor
         addSubview(placeholderLabel)
         NSLayoutConstraint.activate([
-            lineNumberView.leadingAnchor.constraint(equalTo: leadingAnchor),
-            lineNumberView.topAnchor.constraint(equalTo: topAnchor),
-            lineNumberView.bottomAnchor.constraint(equalTo: bottomAnchor),
-            lineNumberView.widthAnchor.constraint(equalToConstant: 62),
-            scrollView.leadingAnchor.constraint(equalTo: lineNumberView.trailingAnchor),
+            scrollView.leadingAnchor.constraint(equalTo: leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: trailingAnchor),
             scrollView.topAnchor.constraint(equalTo: topAnchor),
             scrollView.bottomAnchor.constraint(equalTo: bottomAnchor),
-            placeholderLabel.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 70),
+            placeholderLabel.leadingAnchor.constraint(equalTo: leadingAnchor),
             placeholderLabel.topAnchor.constraint(equalTo: topAnchor, constant: 10)
         ])
     }

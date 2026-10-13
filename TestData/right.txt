@@ -1,0 +1,50 @@
+
+# 对比测试数据 — Diflo
+共同内容：这行应该没有高亮。
+
+## 01 单行修改
+timeout = 30
+
+## 02 仅左侧多行
+
+## 03 仅右侧多行
+feature = enabled
+新增配置：第一行
+新增配置：第二行
+以下是共同锚点
+
+## 04 不等长替换
+新方案：准备阶段
+新方案：执行阶段
+新方案：完成阶段
+
+## 05 中文与 Emoji
+欢迎使用文本对比 🚀，状态：已完成
+
+## 06 空格、Tab 与大小写
+name  =  Alice
+	indented = true
+trailing = value
+casesensitive = value
+
+## 07 空行增删
+空行前
+空行后
+
+## 08 重复内容
+repeat = same
+repeat = same
+repeat = new
+repeat = same
+
+## 09 顺序交换
+second = B
+first = A
+
+## 10 长行（测试横向同步滚动）
+long = 中文片段 abcdefghijklmnopqrstuvwxyz | 中文片段 abcdefghijklmnopqrstuvwxyz | 中文片段 abcdefghijklmnopqrstuvwxyz | 中文片段 abcdefghijklmnopqrstuvwxyz | 中文片段 abcdefghijklmnopqrstuvwxyz | 中文片段 abcdefghijklmnopqrstuvwxyz | 中文片段 abcdefghijklmnopqrstuvwxyz | 中文片段 abcdefghijklmnopqrstuvwxyz | 中文片段 abcdefghijklmnopqrstuvwxyz | 中文片段 abcdefghijklmnopqrstuvwxyz | 中文片段 abcdefghijklmnopqrstuvwxyz | 中文片段 abcdefghijklmnopqrstuvwxyz | 中文片段 abcdefghijklmnopqrstuvwxyz | 中文片段 abcdefghijklmnopqrstuvwxyz | 中文片段 abcdefghijklmnopqrstuvwxyz | 中文片段 abcdefghijklmnopqrstuvwxyz | 中文片段 abcdefghijklmnopqrstuvwxyz | 中文片段 abcdefghijklmnopqrstuvwxyz | 中文片段 abcdefghijklmnopqrstuvwxyz | 中文片段 abcdefghijklmnopqrstuvwxyz | 中文片段 abcdefghijklmnopqrstuvwxyz | 中文片段 abcdefghijklmnopqrstuvwxyz | 中文片段 abcdefghijklmnopqrstuvwxyz | 中文片段 abcdefghijklmnopqrstuvwxyz | 中文片段 abcdefghijklmnopqrstuvwxyz | 中文片段 abcdefghijklmnopqrstuvwxyz | 中文片段 abcdefghijklmnopqrstuvwxyz | 中文片段 abcdefghijklmnopqrstuvwxyz | 中文片段 abcdefghijklmnopqrstuvwxyz | 中文片段 abcdefghijklmnopqrstuvwxyz | RIGHT
+
+## 11 文件结尾
+共同结尾：这里之后有单侧内容。
+仅右侧：末尾新增行
+仅右侧：另一行（带末尾换行）

@@ -4,6 +4,14 @@ import Testing
 
 @MainActor
 struct MeldRenderingTests {
+    @Test func emptyBandAndRowBandShareTheSameConnectorCoordinates() {
+        let empty = DiffTextView.diffBandRect(for: 3..<3, width: 64, offset: 7.5)
+        let row = DiffTextView.diffBandRect(for: 3..<4, width: 400, offset: 7.5)
+        #expect(empty.height == 2)
+        #expect(empty.midY == row.minY)
+        #expect(row.height == DiffTextView.rowHeight)
+    }
+
     @Test func textRowsMatchGutterAndConnectorHeight() throws {
         let editor = DiffTextView.createStandard(side: .left)
         editor.configure(text: "same\nchanged\nend", lineCount: 3, hunks: [], side: .left, selectedHunkID: nil)
@@ -37,7 +45,7 @@ struct MeldRenderingTests {
         NSColor.white.setFill()
         NSRect(x: 0, y: 0, width: 400, height: 120).fill()
         editor.drawBackground(in: editor.bounds)
-        let color = try #require(bitmap.colorAt(x: 300, y: 80)?.usingColorSpace(.sRGB))
+        let color = try #require(bitmap.colorAt(x: 300, y: 120 - Int(DiffTextView.verticalInset + 1.5 * DiffTextView.rowHeight))?.usingColorSpace(.sRGB))
         switch kind {
         case .modified: #expect(color.blueComponent - color.redComponent > 0.05)
         case .leftOnly: #expect(color.redComponent - color.greenComponent > 0.05)

@@ -24,26 +24,31 @@ struct ComparisonWorkspaceView: View {
             .frame(maxWidth: .infinity)
             .zIndex(10)
 
-            Divider().zIndex(10)
+            Divider().opacity(0.5).zIndex(10)
 
             // 2. 文件标头栏
             HStack(spacing: 0) {
                 BufferHeaderView(
                     buffer: session.leftBuffer,
                     side: .left,
-                    open: { open(.left) }
+                    open: { open(.left) },
+                    clear: { clear(.left) }
                 )
-                Divider()
+                panelSeparator
                 BufferHeaderView(
                     buffer: session.rightBuffer,
                     side: .right,
-                    open: { open(.right) }
+                    open: { open(.right) },
+                    clear: { clear(.right) }
                 )
+                Divider().opacity(0.5)
+                Color.clear.frame(width: 12)
             }
-            .frame(height: 46)
+            .frame(height: 38)
+            .background(Color(nsColor: .controlBackgroundColor))
             .zIndex(10)
 
-            Divider().zIndex(10)
+            Divider().opacity(0.5).zIndex(10)
 
             // 3. 中间对比工作区：可编辑双栏 + 贝塞尔曲面连线 + Hunk 感知滚动同步
             MeldDualEditorWorkspaceView(
@@ -54,15 +59,18 @@ struct ComparisonWorkspaceView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .layoutPriority(1)
 
-            Divider().zIndex(10)
+            Divider().opacity(0.5).zIndex(10)
 
             // 4. 底部状态栏
             HStack(spacing: 0) {
                 BufferStatusBar(buffer: session.leftBuffer, cursor: cursorPositions[.left] ?? .start)
-                Divider()
+                panelSeparator
                 BufferStatusBar(buffer: session.rightBuffer, cursor: cursorPositions[.right] ?? .start)
+                Divider().opacity(0.5)
+                Color.clear.frame(width: 12)
             }
-            .frame(height: 28)
+            .frame(height: 24)
+            .background(.bar)
             .zIndex(10)
         }
         .confirmationDialog(
@@ -83,6 +91,29 @@ struct ComparisonWorkspaceView: View {
         .onChange(of: session.result?.hunks) { _, newHunks in
             scrollCoordinator.updateHunks(newHunks ?? [])
         }
+    }
+
+    private func clear(_ side: ComparisonSide) {
+        let scrollView = side == .left ? scrollCoordinator.leftScrollView : scrollCoordinator.rightScrollView
+        if let editor = scrollView?.documentView as? DiffTextView {
+            editor.window?.makeFirstResponder(editor)
+            editor.insertText("", replacementRange: NSRange(location: 0, length: (editor.string as NSString).length))
+        } else {
+            session.edit(side, text: "")
+        }
+    }
+
+    private var panelSeparator: some View {
+        Color.clear
+            .frame(width: ChangeGutterView.preferredWidth)
+            .overlay {
+                HStack(spacing: 0) {
+                    Divider()
+                    Spacer(minLength: 0)
+                    Divider()
+                }
+                .opacity(0.5)
+            }
     }
 
     private func requestReturn() {

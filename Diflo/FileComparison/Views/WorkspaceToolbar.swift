@@ -11,7 +11,7 @@ struct WorkspaceToolbar: View {
     var body: some View {
         HStack(spacing: 8) {
             Button("返回", systemImage: "chevron.left", action: returnToLauncher)
-            Divider().frame(height: 18)
+            Divider().frame(height: 16)
             Button("上一个差异", systemImage: "chevron.up", action: session.selectPreviousHunk)
                 .labelStyle(.iconOnly)
                 .help("上一个差异 (⌘↑)")
@@ -25,12 +25,13 @@ struct WorkspaceToolbar: View {
             Spacer()
             if session.isWorking { ProgressView().controlSize(.small) }
             Text(summary)
-                .font(.callout.monospacedDigit())
+                .font(.caption.monospacedDigit())
                 .foregroundStyle(.secondary)
             moreMenu
         }
+        .controlSize(.small)
         .padding(.horizontal, 12)
-        .frame(height: 44)
+        .frame(height: 36)
         .background(.bar)
     }
 
@@ -88,6 +89,6 @@ struct WorkspaceToolbar: View {
         return result.differenceCount == 0 ? "内容相同" : "\(result.hunks.count) 个差异块"
     }
 
-    private func undo() { NSApp.sendAction(Selector(("undo:")), to: nil, from: nil) }
-    private func redo() { NSApp.sendAction(Selector(("redo:")), to: nil, from: nil) }
+    private func undo() { session.undoManager.undo() }
+    private func redo() { session.undoManager.redo() }
 }
