@@ -89,7 +89,7 @@ final class DualScrollCoordinator: NSObject {
                 targetY = min(targetMax, max(0, (targetEditor.geometry.y(for: mapped) ?? target.contentView.bounds.midY) - target.contentSize.height / 2))
             } else { targetY = target.contentView.bounds.minY }
         } else {
-            targetY = mapScrollPosition(sourceY: sourceY, sourceIsLeft: sourceIsLeft, sourceMax: sourceMax, targetMax: targetMax)
+            targetY = mapScrollPosition(sourceY: sourceY, sourceIsLeft: sourceIsLeft, sourceMax: sourceMax, targetMax: targetMax, sourceViewport: source.contentSize.height, targetViewport: target.contentSize.height)
         }
 
         var targetOrigin = target.contentView.bounds.origin
@@ -117,63 +117,51 @@ final class DualScrollCoordinator: NSObject {
         overviewView?.updateViewport(progress: viewportProgress, visibleFraction: visibleFraction)
     }
 
-    /// Piecewise Hunk-Aware Scroll Sync: Maps source Y coordinate to target Y so matching lines align horizontally.
-    private func mapScrollPosition(sourceY: Double, sourceIsLeft: Bool, sourceMax: Double, targetMax: Double) -> Double {
+    /// Interpolate around each diff over a viewport so empty source ranges cannot jump.
+    private func mapScrollPosition(sourceY: Double, sourceIsLeft: Bool, sourceMax: Double, targetMax: Double,
+                                   sourceViewport: Double, targetViewport: Double) -> Double {
         guard targetMax > 0 else { return 0 }
-        if sourceY <= 0 {
-            return sourceY
-        }
-        if sourceMax > 0, sourceY >= sourceMax {
-            return targetMax + (sourceY - sourceMax)
-        }
-        guard !hunks.isEmpty, sourceMax > 0 else {
-            let progress = sourceMax > 0 ? sourceY / sourceMax : 0
-            return min(max(0, progress * targetMax), targetMax)
-        }
+        if sourceY <= 0 { return sourceY }
+        if sourceMax > 0, sourceY >= sourceMax { return targetMax + (sourceY - sourceMax) }
+        guard sourceMax > 0 else { return 0 }
 
         let rowHeight = DiffTextView.rowHeight
         let inset = DiffTextView.verticalInset
-        let sourceLine = max(0, (sourceY - inset) / rowHeight)
-
-        let targetLine = mapLine(sourceLine: sourceLine, sourceIsLeft: sourceIsLeft)
-        let calculatedY = inset + targetLine * rowHeight
-
-        // Smoothly clamp to document bounds
-        return min(max(0, calculatedY), targetMax)
-    }
-
-    private func mapLine(sourceLine: Double, sourceIsLeft: Bool) -> Double {
-        var prevSourceEnd = 0.0
-        var prevTargetEnd = 0.0
-
+        var transitions: [(sourceStart: Double, sourceEnd: Double, targetStart: Double, targetEnd: Double)] = []
         for hunk in hunks {
-            let srcStart = Double(sourceIsLeft ? hunk.leftLineRange.lowerBound : hunk.rightLineRange.lowerBound)
-            let srcEnd = Double(sourceIsLeft ? hunk.leftLineRange.upperBound : hunk.rightLineRange.upperBound)
-            let tgtStart = Double(sourceIsLeft ? hunk.rightLineRange.lowerBound : hunk.leftLineRange.lowerBound)
-            let tgtEnd = Double(sourceIsLeft ? hunk.rightLineRange.upperBound : hunk.leftLineRange.upperBound)
-
-            // Before this hunk (in matching lines)
-            if sourceLine < srcStart {
-                return prevTargetEnd + (sourceLine - prevSourceEnd)
+            let source = sourceIsLeft ? hunk.leftLineRange : hunk.rightLineRange
+            let target = sourceIsLeft ? hunk.rightLineRange : hunk.leftLineRange
+            let start = min(sourceMax, max(0, inset + Double(source.lowerBound) * rowHeight - sourceViewport / 2))
+            let end = min(sourceMax, max(0, inset + Double(source.upperBound) * rowHeight + sourceViewport / 2))
+            let targetStart = min(targetMax, max(0, inset + Double(target.lowerBound) * rowHeight - targetViewport / 2))
+            let targetEnd = min(targetMax, max(0, inset + Double(target.upperBound) * rowHeight + targetViewport / 2))
+            // Nearby transitions share one interval; overlapping anchors would reverse the mapping.
+            if let previous = transitions.last, start <= previous.sourceEnd || targetStart <= previous.targetEnd {
+                transitions[transitions.count - 1].sourceEnd = max(previous.sourceEnd, end)
+                transitions[transitions.count - 1].targetEnd = max(previous.targetEnd, targetEnd)
+            } else {
+                transitions.append((start, end, targetStart, targetEnd))
             }
-
-            // Inside this hunk
-            if sourceLine <= srcEnd {
-                let srcLen = srcEnd - srcStart
-                let tgtLen = tgtEnd - tgtStart
-                if srcLen <= 0 {
-                    return tgtStart
-                }
-                let fraction = (sourceLine - srcStart) / srcLen
-                return tgtStart + fraction * tgtLen
-            }
-
-            prevSourceEnd = srcEnd
-            prevTargetEnd = tgtEnd
         }
 
-        // After all hunks (trailing matching lines)
-        return prevTargetEnd + (sourceLine - prevSourceEnd)
+        var previousSource = 0.0
+        var previousTarget = 0.0
+        for transition in transitions {
+            for (source, target) in [(transition.sourceStart, transition.targetStart),
+                                     (transition.sourceEnd, transition.targetEnd)] {
+                // Document edges use the shared (0, 0) and (sourceMax, targetMax) anchors.
+                guard source > previousSource, target > previousTarget,
+                      source < sourceMax, target < targetMax else { continue }
+                if sourceY <= source {
+                    let fraction = (sourceY - previousSource) / (source - previousSource)
+                    return previousTarget + fraction * (target - previousTarget)
+                }
+                previousSource = source
+                previousTarget = target
+            }
+        }
+        let fraction = (sourceY - previousSource) / (sourceMax - previousSource)
+        return previousTarget + fraction * (targetMax - previousTarget)
     }
 
     func scrollToProgress(_ progress: Double) {

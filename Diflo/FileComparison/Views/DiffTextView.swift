@@ -105,6 +105,19 @@ final class DiffTextView: NSTextView {
     override var acceptsFirstResponder: Bool { true }
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
+    override func cursorUpdate(with event: NSEvent) {
+        if let scroll = enclosingScrollView as? DiffOverlayScrollView {
+            scroll.updatePointerCursor(with: event)
+        } else {
+            super.cursorUpdate(with: event)
+        }
+    }
+
+    override func mouseMoved(with event: NSEvent) {
+        super.mouseMoved(with: event)
+        (enclosingScrollView as? DiffOverlayScrollView)?.updatePointerCursor(with: event)
+    }
+
     override func becomeFirstResponder() -> Bool {
         let accepted = super.becomeFirstResponder()
         needsDisplay = true
@@ -259,7 +272,7 @@ final class DiffTextView: NSTextView {
     override func drawBackground(in rect: NSRect) {
         NSGraphicsContext.saveGraphicsState()
         defer { NSGraphicsContext.restoreGraphicsState() }
-        NSBezierPath(rect: bounds).addClip()
+        NSBezierPath(rect: bounds.intersection(rect)).addClip()
         super.drawBackground(in: rect)
         let first = max(0, Int(floor((rect.minY - Self.verticalInset) / Self.rowHeight)))
         let end = min(rowHighlights.count, Int(ceil((rect.maxY - Self.verticalInset) / Self.rowHeight)))
@@ -314,6 +327,10 @@ final class DiffTextView: NSTextView {
     private func clearInlineHighlights() {
         inlineTask?.cancel()
         inlineGeneration += 1
+        removeInlineHighlights()
+    }
+
+    private func removeInlineHighlights() {
         let document = NSRange(location: 0, length: (string as NSString).length)
         for range in inlineRanges {
             let clipped = NSIntersectionRange(range, document)
@@ -330,9 +347,16 @@ final class DiffTextView: NSTextView {
         let end = Int(min(CGFloat(lineIndex.lines.count), max(CGFloat(first), ceil((viewport.maxY - Self.verticalInset) / Self.rowHeight))))
         let visible = first..<end
         let text = indexedText
-        guard inlineVisibleLines != visible || inlineInputText != text || inlineInputHunks != decorationHunks ||
-              inlineInputSide != decorationSide || inlineInputOpposite != oppositeLines else { return }
-        clearInlineHighlights()
+        let inputsChanged = inlineInputText != text || inlineInputHunks != decorationHunks ||
+            inlineInputSide != decorationSide || inlineInputOpposite != oppositeLines
+        guard inlineVisibleLines != visible || inputsChanged else { return }
+        if inputsChanged {
+            clearInlineHighlights()
+        } else {
+            // Scrolling changes the work to request, not the validity of existing decorations.
+            inlineTask?.cancel()
+            inlineGeneration += 1
+        }
         inlineVisibleLines = visible
         inlineInputText = text
         inlineInputHunks = decorationHunks
@@ -362,6 +386,8 @@ final class DiffTextView: NSTextView {
             }
             guard let self, !Task.isCancelled, self.inlineGeneration == generation, self.string == text else { return }
             guard !self.hasMarkedText() else { self.inlineVisibleLines = nil; return }
+            // Replace decorations together on the main actor, without an empty frame in between.
+            self.removeInlineHighlights()
             let isDark = self.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
             let color = isDark ? NSColor(red: 0.14, green: 0.32, blue: 0.49, alpha: 0.9) : NSColor(red: 0.54, green: 0.76, blue: 1, alpha: 0.65)
             for range in ranges where NSMaxRange(range) <= index.utf16Count {

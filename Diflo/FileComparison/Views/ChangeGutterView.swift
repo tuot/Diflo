@@ -179,7 +179,7 @@ final class ChangeGutterView: NSView {
     }
 
     override func mouseExited(with event: NSEvent) {
-        NSCursor.arrow.set()
+        // The destination view owns the cursor after exiting this tracking area.
         if hoveredHunkID != nil || hoveredButtonSide != nil {
             hoveredHunkID = nil
             hoveredButtonSide = nil

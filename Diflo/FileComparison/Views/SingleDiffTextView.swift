@@ -51,10 +51,8 @@ struct SingleDiffTextView: NSViewRepresentable {
         textView.sharedUndoManager = sharedUndoManager
 
         scrollView.documentView = textView
-        scrollView.hasVerticalScroller = true
-        scrollView.hasHorizontalScroller = true
-        scrollView.verticalScroller = HoverScroller(frame: NSRect(x: 0, y: 0, width: 12, height: 200))
-        scrollView.horizontalScroller = HoverScroller(frame: NSRect(x: 0, y: 0, width: 200, height: 12))
+        scrollView.hasVerticalScroller = false
+        scrollView.hasHorizontalScroller = false
         scrollView.scrollerStyle = .overlay
         scrollView.verticalScrollElasticity = .none
         scrollView.horizontalScrollElasticity = .none
