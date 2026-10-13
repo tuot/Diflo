@@ -120,4 +120,7 @@ iOSInjectionProject/
 .export/
 *.dmg
 
+# LLVM profiling artifacts
+*.profraw
+
 # End of https://www.toptal.com/developers/gitignore/api/macos,swift
