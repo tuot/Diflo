@@ -1,5 +1,5 @@
-# Created by https://www.toptal.com/developers/gitignore/api/macos,visualstudiocode,xcode,swift
-# Edit at https://www.toptal.com/developers/gitignore?templates=macos,visualstudiocode,xcode,swift
+# Created by https://www.toptal.com/developers/gitignore/api/macos,swift
+# Edit at https://www.toptal.com/developers/gitignore?templates=macos,swift
 
 ### macOS ###
 # General
@@ -48,7 +48,6 @@ xcuserdata/
 
 ## compatibility with Xcode 3 and earlier (ignoring not required starting Xcode 4)
 build/
-.build-dd/
 DerivedData/
 *.moved-aside
 *.pbxuser
@@ -83,6 +82,7 @@ playground.xcworkspace
 # .swiftpm
 
 .build/
+.worktrees/
 
 # CocoaPods
 # We recommend against adding the Pods directory to your .gitignore. However
@@ -103,14 +103,11 @@ Dependencies/
 .accio/
 
 # fastlane
-# It is recommended to not store the screenshots in the git repo.
-# Instead, use fastlane to re-generate the screenshots whenever they are needed.
-# For more information about the recommended setup visit:
-# https://docs.fastlane.tools/best-practices/source-control/#source-control
-
+.bundle/*
+!.bundle/config
+vendor/bundle/
 fastlane/report.xml
 fastlane/Preview.html
-fastlane/screenshots/**/*.png
 fastlane/test_output
 
 # Code Injection
@@ -119,36 +116,8 @@ fastlane/test_output
 
 iOSInjectionProject/
 
-### VisualStudioCode ###
-.vscode/*
-!.vscode/settings.json
-!.vscode/tasks.json
-!.vscode/launch.json
-!.vscode/extensions.json
-!.vscode/*.code-snippets
+# Release Artifacts
+.export/
+*.dmg
 
-# Local History for Visual Studio Code
-.history/
-
-# Built Visual Studio Code Extensions
-*.vsix
-
-### VisualStudioCode Patch ###
-# Ignore all local history of files
-.history
-.ionide
-
-### Xcode ###
-
-## Xcode 8 and earlier
-
-### Xcode Patch ###
-*.xcodeproj/*
-!*.xcodeproj/project.pbxproj
-!*.xcodeproj/xcshareddata/
-!*.xcodeproj/project.xcworkspace/
-!*.xcworkspace/contents.xcworkspacedata
-/*.gcno
-**/xcshareddata/WorkspaceSettings.xcsettings
-
-# End of https://www.toptal.com/developers/gitignore/api/macos,visualstudiocode,xcode,swift
+# End of https://www.toptal.com/developers/gitignore/api/macos,swift
