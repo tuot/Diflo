@@ -87,7 +87,11 @@ final class ChangeGutterView: NSView {
         defer { NSGraphicsContext.restoreGraphicsState() }
         // AppKit may invalidate an ancestor's entire area; never paint over the editors.
         NSBezierPath(rect: bounds).addClip()
-        NSColor.textBackgroundColor.setFill()
+        let isDark = effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        let gutterBackground = NSColor.textBackgroundColor.blended(
+            withFraction: isDark ? 0.08 : 0.035, of: .labelColor
+        ) ?? NSColor.textBackgroundColor
+        gutterBackground.setFill()
         dirtyRect.fill()
 
         for hunk in hunks {
@@ -106,7 +110,8 @@ final class ChangeGutterView: NSView {
             let hunkColor = color(for: hunk)
 
             let highlight: DiffRowPresentation.Highlight = hunk.kind == .modified ? .modification : (hunk.kind == .leftOnly ? .deletion : .insertion)
-            let fill = DiffTextView.backgroundColor(for: highlight, appearance: effectiveAppearance) ?? hunkColor
+            let editorFill = DiffTextView.backgroundColor(for: highlight, appearance: effectiveAppearance) ?? hunkColor
+            let fill = editorFill.blended(withFraction: isDark ? 0.20 : 0.14, of: hunkColor) ?? editorFill
             fill.setFill()
             path.fill()
 
@@ -209,14 +214,47 @@ final class ChangeGutterView: NSView {
     }
 
     private func mergeButtons(for hunk: DiffHunk) -> [(source: ComparisonSide, rect: NSRect)] {
+        let leftRect = connectionBand(for: hunk, side: .left)
+        let rightRect = connectionBand(for: hunk, side: .right)
+        let bend = max(abs(leftRect.minY - rightRect.minY), abs(leftRect.maxY - rightRect.maxY))
+        let inset = 20 - 7 * min(1, bend / max(1, bounds.width))
+
+        // Invert the connector's cubic x coordinate, then sample its vertical edges.
+        func bandEdges(at x: CGFloat) -> (top: CGFloat, bottom: CGFloat) {
+            let fraction = min(1, max(0, (x - bounds.minX) / max(1, bounds.width)))
+            var lower: CGFloat = 0
+            var upper: CGFloat = 1
+            for _ in 0..<16 {
+                let t = (lower + upper) / 2
+                let curveX = 1.5 * t - 1.5 * t * t + t * t * t
+                if curveX < fraction { lower = t } else { upper = t }
+            }
+            let t = (lower + upper) / 2
+            let weight = t * t * (3 - 2 * t)
+            return (leftRect.minY + (rightRect.minY - leftRect.minY) * weight,
+                    leftRect.maxY + (rightRect.maxY - leftRect.maxY) * weight)
+        }
+
+        func buttonRect(at x: CGFloat) -> NSRect {
+            let center = bandEdges(at: x)
+            let leading = bandEdges(at: x - 6)
+            let trailing = bandEdges(at: x + 6)
+            // Keep the entire glyph inside where possible, including sloping edges.
+            let minY = max(leading.top, trailing.top) + 6
+            let maxY = min(leading.bottom, trailing.bottom) - 6
+            let y = minY <= maxY
+                ? min(maxY, max(minY, center.top + DiffTextView.rowHeight / 2))
+                : (center.top + center.bottom) / 2
+            return NSRect(x: x - 11, y: y - DiffTextView.rowHeight / 2,
+                          width: 22, height: DiffTextView.rowHeight)
+        }
+
         var buttons: [(ComparisonSide, NSRect)] = []
         if !hunk.leftLineRange.isEmpty {
-            let y = connectionBand(for: hunk, side: .left).minY
-            buttons.append((.left, NSRect(x: bounds.minX + 2, y: y, width: 22, height: DiffTextView.rowHeight)))
+            buttons.append((.left, buttonRect(at: bounds.minX + inset)))
         }
         if !hunk.rightLineRange.isEmpty {
-            let y = connectionBand(for: hunk, side: .right).minY
-            buttons.append((.right, NSRect(x: bounds.maxX - 24, y: y, width: 22, height: DiffTextView.rowHeight)))
+            buttons.append((.right, buttonRect(at: bounds.maxX - inset)))
         }
         return buttons
     }
@@ -252,7 +290,7 @@ final class ChangeGutterView: NSView {
     }
 
     private func color(for hunk: DiffHunk) -> NSColor {
-        let isDark = NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        let isDark = effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
         switch hunk.kind {
         case .leftOnly:
             return isDark
