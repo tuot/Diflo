@@ -174,6 +174,8 @@ final class DiffTextView: NSTextView {
         textView.isEditable = true
         textView.isSelectable = true
         textView.allowsUndo = true
+        textView.usesFindBar = true
+        textView.isIncrementalSearchingEnabled = true
         textView.isRichText = false
         textView.importsGraphics = false
         textView.isAutomaticQuoteSubstitutionEnabled = false

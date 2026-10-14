@@ -253,15 +253,29 @@ final class DiffOverlayScrollView: NSScrollView {
             return
         }
         let clip = contentView.bounds
-        let verticalTravel = max(0, document.bounds.height - clip.height)
-        let horizontalTravel = max(0, document.bounds.width - clip.width)
+        let insets = contentView.contentInsets
+        let verticalRange = scrollRange(vertical: true)
+        let horizontalRange = scrollRange(vertical: false)
+        let verticalTravel = verticalRange.upperBound - verticalRange.lowerBound
+        let horizontalTravel = horizontalRange.upperBound - horizontalRange.lowerBound
         verticalOverlayScroller.isHidden = verticalTravel == 0
         horizontalOverlayScroller.isHidden = horizontalTravel == 0
-        verticalOverlayScroller.knobProportion = min(1, clip.height / max(1, document.bounds.height))
-        horizontalOverlayScroller.knobProportion = min(1, clip.width / max(1, document.bounds.width))
-        let verticalProgress = verticalTravel > 0 ? (clip.minY - document.bounds.minY) / verticalTravel : 0
+        verticalOverlayScroller.knobProportion = min(1, max(0, clip.height - insets.top - insets.bottom) / max(1, document.bounds.height))
+        horizontalOverlayScroller.knobProportion = min(1, max(0, clip.width - insets.left - insets.right) / max(1, document.bounds.width))
+        let verticalProgress = verticalTravel > 0 ? (clip.minY - verticalRange.lowerBound) / verticalTravel : 0
         verticalOverlayScroller.doubleValue = contentView.isFlipped ? verticalProgress : 1 - verticalProgress
-        horizontalOverlayScroller.doubleValue = horizontalTravel > 0 ? (clip.minX - document.bounds.minX) / horizontalTravel : 0
+        horizontalOverlayScroller.doubleValue = horizontalTravel > 0 ? (clip.minX - horizontalRange.lowerBound) / horizontalTravel : 0
+    }
+
+    private func scrollRange(vertical: Bool) -> ClosedRange<CGFloat> {
+        let document = documentView?.bounds ?? .zero
+        let clip = contentView.bounds
+        let insets = contentView.contentInsets
+        let leadingInset = vertical ? (contentView.isFlipped ? insets.top : insets.bottom) : insets.left
+        let trailingInset = vertical ? (contentView.isFlipped ? insets.bottom : insets.top) : insets.right
+        let start = (vertical ? document.minY : document.minX) - leadingInset
+        let end = (vertical ? document.maxY - clip.height : document.maxX - clip.width) + trailingInset
+        return start...max(start, end)
     }
 
     @objc private func overlayScrollerChanged(_ sender: HoverScroller) {
@@ -269,17 +283,18 @@ final class DiffOverlayScrollView: NSScrollView {
     }
 
     func scrollOverlayScroller(_ sender: HoverScroller, part: NSScroller.Part) {
-        guard let document = documentView else { return }
+        guard documentView != nil else { return }
         let vertical = sender === verticalOverlayScroller
         let viewport = vertical ? contentView.bounds.height : contentView.bounds.width
-        let travel = max(0, (vertical ? document.bounds.height : document.bounds.width) - viewport)
+        let range = scrollRange(vertical: vertical)
+        let travel = range.upperBound - range.lowerBound
         let reversed = vertical && !contentView.isFlipped
         var origin = contentView.bounds.origin
         var position = vertical ? origin.y : origin.x
         switch part {
         case .knob:
             position = (reversed ? 1 - sender.doubleValue : sender.doubleValue) * travel
-                + (vertical ? document.bounds.minY : document.bounds.minX)
+                + range.lowerBound
         case .incrementPage, .decrementPage:
             let direction: CGFloat = part == .incrementPage ? 1 : -1
             position += direction * (reversed ? -1 : 1) * viewport * 0.9
@@ -324,7 +339,8 @@ final class DiffOverlayScrollView: NSScrollView {
             return
         }
         let point = convert(event.locationInWindow, from: nil)
-        guard bounds.contains(point) else { return }
+        guard contentView.frame.contains(point),
+              !(isFindBarVisible && findBarView?.frame.contains(point) == true) else { return }
         let overScroller = [verticalOverlayScroller, horizontalOverlayScroller].contains {
             !$0.isHidden && $0.alphaValue > 0.01 && $0.frame.contains(point)
         }
@@ -394,14 +410,21 @@ final class DiffOverlayScrollView: NSScrollView {
 
     override func tile() {
         super.tile()
-        // The editor reaches the gutter edge even when both scrollers are visible.
-        contentView.frame = bounds
+        // Newer AppKit versions overlay the find bar and reserve space using content insets.
+        var viewport = contentView.frame
+        if isFindBarVisible, let bar = findBarView {
+            let overlap = viewport.intersection(convert(bar.bounds, from: bar))
+            if !overlap.isEmpty {
+                viewport.size.height -= overlap.height
+                if overlap.minY == viewport.minY { viewport.origin.y += overlap.height }
+            }
+        }
         let thickness = HoverScroller.overlayThickness
-        let bottom = isFlipped ? bounds.maxY - thickness : bounds.minY
-        verticalOverlayScroller.frame = NSRect(x: bounds.maxX - thickness, y: bounds.minY,
-                                        width: thickness, height: bounds.height)
-        horizontalOverlayScroller.frame = NSRect(x: bounds.minX, y: bottom,
-                                          width: bounds.width - thickness, height: thickness)
+        let bottom = isFlipped ? viewport.maxY - thickness : viewport.minY
+        verticalOverlayScroller.frame = NSRect(x: viewport.maxX - thickness, y: viewport.minY,
+                                        width: thickness, height: viewport.height)
+        horizontalOverlayScroller.frame = NSRect(x: viewport.minX, y: bottom,
+                                          width: viewport.width - thickness, height: thickness)
         updateOverlayScrollers()
     }
 }

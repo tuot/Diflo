@@ -1,0 +1,211 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "%lld 行" : {
+
+    },
+    "editorFindMenu" : {
+      "comment" : "Edit menu submenu containing text search commands.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Find"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "查找"
+          }
+        }
+      }
+    },
+    "editorFindNext" : {
+      "comment" : "Find the next text match in the active editor.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Find Next"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "查找下一个"
+          }
+        }
+      }
+    },
+    "editorFindOpen" : {
+      "comment" : "Open the native find bar in the active editor.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Find…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "查找…"
+          }
+        }
+      }
+    },
+    "editorFindPrevious" : {
+      "comment" : "Find the previous text match in the active editor.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Find Previous"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "查找上一个"
+          }
+        }
+      }
+    },
+    "上一个差异" : {
+
+    },
+    "上一个差异 (⌘↑)" : {
+
+    },
+    "下一个差异" : {
+
+    },
+    "下一个差异 (⌘↓)" : {
+
+    },
+    "丢弃修改" : {
+
+    },
+    "交换两侧" : {
+
+    },
+    "保存右侧" : {
+
+    },
+    "保存左侧" : {
+
+    },
+    "全部采纳右侧内容 (←)" : {
+
+    },
+    "全部采纳左侧内容 (→)" : {
+
+    },
+    "删除右侧差异块" : {
+
+    },
+    "删除左侧差异块" : {
+
+    },
+    "取消" : {
+
+    },
+    "右侧另存为…" : {
+
+    },
+    "复制差异块到右侧" : {
+
+    },
+    "复制差异块到左侧" : {
+
+    },
+    "好" : {
+
+    },
+    "左侧另存为…" : {
+
+    },
+    "开始对比" : {
+
+    },
+    "忽略大小写" : {
+
+    },
+    "忽略所有空白" : {
+
+    },
+    "忽略行尾空白" : {
+
+    },
+    "打开%@文件" : {
+
+    },
+    "批量合并" : {
+
+    },
+    "撤销" : {
+
+    },
+    "操作失败" : {
+
+    },
+    "新建对比" : {
+
+    },
+    "更多" : {
+
+    },
+    "更多操作" : {
+
+    },
+    "有未保存的修改" : {
+
+    },
+    "比较选项" : {
+
+    },
+    "清空%@" : {
+
+    },
+    "清空%@文本，可撤销" : {
+
+    },
+    "空白对比" : {
+
+    },
+    "纯文本" : {
+
+    },
+    "行 %lld，列 %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "行 %1$lld，列 %2$lld"
+          }
+        }
+      }
+    },
+    "返回" : {
+
+    },
+    "返回新建页将丢失左右两侧尚未保存的内容。" : {
+
+    },
+    "选择%@文件" : {
+
+    },
+    "选择两个文本文件，或从空白内容开始" : {
+
+    },
+    "重做" : {
+
+    }
+  },
+  "version" : "1.0"
+}

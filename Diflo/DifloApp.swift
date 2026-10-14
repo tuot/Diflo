@@ -7,6 +7,9 @@ struct DifloApp: App {
             ContentView()
         }
         .defaultSize(width: 1_080, height: 720)
-        .commands { ComparisonUndoCommands() }
+        .commands {
+            ComparisonUndoCommands()
+            ComparisonFindCommands()
+        }
     }
 }

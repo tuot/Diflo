@@ -51,6 +51,7 @@ struct SingleDiffTextView: NSViewRepresentable {
         textView.sharedUndoManager = sharedUndoManager
 
         scrollView.documentView = textView
+        scrollView.findBarPosition = .aboveContent
         scrollView.hasVerticalScroller = false
         scrollView.hasHorizontalScroller = false
         scrollView.scrollerStyle = .overlay
@@ -265,14 +266,15 @@ final class DiffEditorContainerView: NSView {
         placeholderLabel.translatesAutoresizingMaskIntoConstraints = false
         placeholderLabel.font = DiffTextView.editorFont
         placeholderLabel.textColor = .placeholderTextColor
-        addSubview(placeholderLabel)
+        let placeholderContent = scrollView.documentView ?? scrollView.contentView
+        placeholderContent.addSubview(placeholderLabel)
         NSLayoutConstraint.activate([
             scrollView.leadingAnchor.constraint(equalTo: leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: trailingAnchor),
             scrollView.topAnchor.constraint(equalTo: topAnchor),
             scrollView.bottomAnchor.constraint(equalTo: bottomAnchor),
-            placeholderLabel.leadingAnchor.constraint(equalTo: leadingAnchor),
-            placeholderLabel.topAnchor.constraint(equalTo: topAnchor, constant: 10)
+            placeholderLabel.leadingAnchor.constraint(equalTo: placeholderContent.leadingAnchor),
+            placeholderLabel.topAnchor.constraint(equalTo: placeholderContent.topAnchor, constant: 10)
         ])
     }
 
