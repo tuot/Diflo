@@ -97,7 +97,8 @@ struct ComparisonWorkspaceView: View {
         let scrollView = side == .left ? scrollCoordinator.leftScrollView : scrollCoordinator.rightScrollView
         if let editor = scrollView?.documentView as? DiffTextView {
             editor.window?.makeFirstResponder(editor)
-            editor.insertText("", replacementRange: NSRange(location: 0, length: (editor.string as NSString).length))
+            editor.unmarkText()
+            editor.applyExternalText("", undoable: true)
         } else {
             session.edit(side, text: "")
         }

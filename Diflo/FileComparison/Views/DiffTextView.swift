@@ -86,16 +86,36 @@ final class DiffTextView: NSTextView {
         clearInlineHighlights()
         let selection = selectedRange()
         if undoable {
-            let range = NSRange(location: 0, length: (string as NSString).length)
-            guard shouldChangeText(in: range, replacementString: text) else { return }
-            replaceCharacters(in: range, with: text)
-            didChangeText()
+            applyUndoableText(text, selection: NSRange(location: min(selection.location, (text as NSString).length), length: 0))
+            return
         } else {
             textStorage?.setAttributedString(NSAttributedString(string: text, attributes: baseAttributes))
             undoManager?.removeAllActions()
         }
         synchronizeLineIndex()
         setSelectedRange(NSRange(location: min(selection.location, (text as NSString).length), length: 0))
+    }
+
+    private func applyUndoableText(_ text: String, selection: NSRange) {
+        let previousText = string
+        let previousSelection = selectedRange()
+        let manager = undoManager
+        breakUndoCoalescing()
+        // Native whole-document undo selects the entire restored text. Record the
+        // selection explicitly and suppress that native undo entry.
+        manager?.disableUndoRegistration()
+        let range = NSRange(location: 0, length: (previousText as NSString).length)
+        let accepted = shouldChangeText(in: range, replacementString: text)
+        if accepted { replaceCharacters(in: range, with: text) }
+        manager?.enableUndoRegistration()
+        guard accepted else { return }
+        manager?.registerUndo(withTarget: self) { editor in
+            editor.applyUndoableText(previousText, selection: previousSelection)
+        }
+        synchronizeLineIndex()
+        setSelectedRange(selection)
+        didChangeText()
+        breakUndoCoalescing()
     }
 
     var placeholderString: String? {
