@@ -1,32 +1,6 @@
 import SwiftUI
 import AppKit
 
-// MARK: - 编辑器面板（承载 SingleDiffTextView）
-
-struct DiffEditorPaneView: View {
-    let side: ComparisonSide
-    let buffer: EditorBuffer
-    let oppositeLines: [String]
-    let hunks: [DiffHunk]
-    let selectedHunkID: DiffHunk.ID?
-    let coordinator: DualScrollCoordinator
-    let onEdit: (String) -> Void
-    let onCursorChanged: (CursorPosition) -> Void
-
-    var body: some View {
-        SingleDiffTextView(
-            side: side,
-            buffer: buffer,
-            oppositeLines: oppositeLines,
-            hunks: hunks,
-            selectedHunkID: selectedHunkID,
-            coordinator: coordinator,
-            onEdit: onEdit,
-            onCursorChanged: onCursorChanged
-        )
-    }
-}
-
 // MARK: - NSViewRepresentable：承载一体化装订线与高亮的 DiffScrollView
 
 struct SingleDiffTextView: NSViewRepresentable {

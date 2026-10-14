@@ -36,12 +36,4 @@ nonisolated struct TextLineIndex: Equatable, Sendable {
         }
         return max(0, low - 1)
     }
-
-    func utf16Range(forLines range: Range<Int>) -> NSRange {
-        let lower = min(max(0, range.lowerBound), lines.count)
-        let upper = min(max(lower, range.upperBound), lines.count)
-        let start = lower < utf16Starts.count ? utf16Starts[lower] : utf16Count
-        let end = upper < utf16Starts.count ? utf16Starts[upper] : utf16Count
-        return NSRange(location: start, length: end - start)
-    }
 }

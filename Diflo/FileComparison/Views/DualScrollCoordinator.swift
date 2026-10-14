@@ -13,9 +13,6 @@ final class DualScrollCoordinator: NSObject {
     weak var gutterView: ChangeGutterView?
     weak var overviewView: DiffOverviewView?
 
-    var alignment = DiffAlignment(rows: [])
-    weak var nativeGutterView: NativeChangeGutterView?
-    var onViewportChanged: (() -> Void)?
     private var isSynchronizing = false
     private var leftHorizontalOffset: CGFloat = 0
     private var rightHorizontalOffset: CGFloat = 0
@@ -28,12 +25,6 @@ final class DualScrollCoordinator: NSObject {
             visibleFraction = min(1, scroll.contentSize.height / height)
             overviewView?.updateViewport(progress: viewportProgress, visibleFraction: visibleFraction)
         }
-        nativeGutterView?.needsDisplay = true
-        onViewportChanged?()
-    }
-
-    func editor(for side: ComparisonSide) -> NativeDiffTextView? {
-        (side == .left ? leftScrollView : rightScrollView)?.documentView as? NativeDiffTextView
     }
 
     func register(scrollView: NSScrollView, for side: ComparisonSide) {
@@ -79,15 +70,6 @@ final class DualScrollCoordinator: NSObject {
         let targetY: Double
         if !verticalChanged {
             targetY = target.contentView.bounds.minY
-        } else if let sourceEditor = source.documentView as? NativeDiffTextView,
-           let targetEditor = target.documentView as? NativeDiffTextView {
-            sourceEditor.refreshGeometry()
-            let center = source.contentView.bounds.midY
-            if let anchor = sourceEditor.geometry.linePosition(at: center) {
-                let mapped = alignment.mappedLine(anchor, from: sourceIsLeft ? .left : .right)
-                if targetEditor.geometry.y(for: mapped) == nil { targetEditor.navigate(to: Int(mapped)) }
-                targetY = min(targetMax, max(0, (targetEditor.geometry.y(for: mapped) ?? target.contentView.bounds.midY) - target.contentSize.height / 2))
-            } else { targetY = target.contentView.bounds.minY }
         } else {
             targetY = mapScrollPosition(sourceY: sourceY, sourceIsLeft: sourceIsLeft, sourceMax: sourceMax, targetMax: targetMax, sourceViewport: source.contentSize.height, targetViewport: target.contentSize.height)
         }
@@ -111,7 +93,6 @@ final class DualScrollCoordinator: NSObject {
         viewportProgress = overviewMax > 0 ? overviewScroll.contentView.bounds.minY / overviewMax : 0
         visibleFraction = min(1.0, overviewScroll.contentSize.height / docHeight)
 
-        (target.documentView as? NativeDiffTextView)?.refreshGeometry()
         geometryChanged()
         gutterView?.updateOffsets(left: leftOffset, right: rightOffset)
         overviewView?.updateViewport(progress: viewportProgress, visibleFraction: visibleFraction)
@@ -184,10 +165,6 @@ final class DualScrollCoordinator: NSObject {
     }
 
     private func scrollTo(scrollView: NSScrollView, line: Int) {
-        if let editor = scrollView.documentView as? NativeDiffTextView {
-            editor.navigate(to: line)
-            return
-        }
         var point = scrollView.contentView.bounds.origin
         point.y = max(0, DiffTextView.verticalInset + Double(line) * DiffTextView.rowHeight - 80)
         scrollView.contentView.animator().setBoundsOrigin(point)

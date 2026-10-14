@@ -90,15 +90,6 @@ final class ComparisonSession {
         }
     }
 
-    func editLine(_ side: ComparisonSide, at lineIndex: Int, text: String) {
-        var lines = buffer(for: side).lines
-        guard lineIndex >= 0 && lineIndex < lines.count else { return }
-        lines[lineIndex] = text
-        let hasTrailing = buffer(for: side).hasTrailingNewline
-        let joined = lines.joined(separator: "\n") + (hasTrailing ? "\n" : "")
-        edit(side, text: joined)
-    }
-
     func swapBuffers() {
         comparisonTask?.cancel()
         (leftBuffer, rightBuffer) = (rightBuffer, leftBuffer)

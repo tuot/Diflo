@@ -27,42 +27,6 @@ struct LineParserTests {
     }
 }
 
-struct IntraLineDiffEngineTests {
-    @Test func identicalLinesProduceNoRanges() {
-        let (left, right) = IntraLineDiffEngine.diff(left: "hello world", right: "hello world")
-        #expect(left.isEmpty)
-        #expect(right.isEmpty)
-    }
-
-    @Test func identifiesChangedWordInMiddle() {
-        let (left, right) = IntraLineDiffEngine.diff(left: "let count = foo", right: "let count = bar")
-        #expect(left == [NSRange(location: 12, length: 3)])
-        #expect(right == [NSRange(location: 12, length: 3)])
-    }
-
-    @Test func identifiesSingleCharacterChange() {
-        let (left, right) = IntraLineDiffEngine.diff(left: "let count = 10", right: "let count = 20")
-        #expect(left == [NSRange(location: 12, length: 1)])
-        #expect(right == [NSRange(location: 12, length: 1)])
-    }
-
-    @Test func identifiesAdditionAtEnd() {
-        let (left, right) = IntraLineDiffEngine.diff(left: "hello", right: "hello world")
-        #expect(left.isEmpty)
-        #expect(right == [NSRange(location: 5, length: 6)])
-    }
-
-    @Test func identifiesMultipleDiscreteChangesInSingleLine() {
-        let (left, right) = IntraLineDiffEngine.diff(left: "func foo(a: Int, b: String)", right: "func bar(a: Double, b: String)")
-        // "foo" -> "bar" (location 5, length 3)
-        // "Int" -> "Double" (location 13, length 3 vs location 13, length 6)
-        #expect(left.count == 2)
-        #expect(right.count == 2)
-        #expect(left[0] == NSRange(location: 5, length: 3))
-        #expect(right[0] == NSRange(location: 5, length: 3))
-    }
-}
-
 struct ComparisonOptionsTests {
     @Test func ignoreCaseTreatsDifferentCasedLinesAsUnchanged() {
         let left = LineParser.parse("Hello WORLD\n", url: fixtureURL("1.txt"), encodingName: "UTF-8")
@@ -484,34 +448,6 @@ struct ComparisonSessionTests {
     }
 }
 
-struct DiffRowPresentationTests {
-    @Test func deletionAppearsOnlyInTheLeftPane() {
-        #expect(DiffRowPresentation.marker(for: .deleted, side: .left) == "−")
-        #expect(DiffRowPresentation.marker(for: .deleted, side: .right) == "")
-        #expect(DiffRowPresentation.highlight(for: .deleted, side: .left) == .deletion)
-        #expect(DiffRowPresentation.highlight(for: .deleted, side: .right) == .none)
-    }
-
-    @Test func insertionAppearsOnlyInTheRightPane() {
-        #expect(DiffRowPresentation.marker(for: .inserted, side: .left) == "")
-        #expect(DiffRowPresentation.marker(for: .inserted, side: .right) == "+")
-        #expect(DiffRowPresentation.highlight(for: .inserted, side: .left) == .none)
-        #expect(DiffRowPresentation.highlight(for: .inserted, side: .right) == .insertion)
-    }
-
-    @Test func modificationHighlightsBothPanesWithoutRelyingOnColorAlone() {
-        #expect(DiffRowPresentation.marker(for: .modified, side: .left) == "~")
-        #expect(DiffRowPresentation.marker(for: .modified, side: .right) == "~")
-        #expect(DiffRowPresentation.highlight(for: .modified, side: .left) == .modification)
-        #expect(DiffRowPresentation.highlight(for: .modified, side: .right) == .modification)
-    }
-
-    @Test func unchangedRowsHaveNoMarkerOrHighlight() {
-        #expect(DiffRowPresentation.marker(for: .unchanged, side: .left) == "")
-        #expect(DiffRowPresentation.highlight(for: .unchanged, side: .left) == .none)
-    }
-}
-
 struct EditableDiffContainerTests {
     @Test @MainActor func standardFactoryRetainsTextSystemAndAcceptsTyping() throws {
         let textView = DiffTextView.createStandard(side: .left)
@@ -552,43 +488,6 @@ struct EditableDiffContainerTests {
         textView.insertText("hello", replacementRange: NSRange(location: 0, length: 0))
 
         #expect(textView.string == "hello")
-    }
-
-    @Test @MainActor func customDiffEditorViewRendersEmptyStateAndAcceptsInput() throws {
-        let editor = CustomDiffEditorView(side: .left)
-        editor.configure(text: "", hunks: [], selectedHunkID: nil)
-
-        #expect(editor.lines.isEmpty)
-        #expect(editor.caretLine == 0)
-        #expect(editor.caretColumn == 0)
-        #expect(!editor.placeholderString.isEmpty)
-
-        // 测试文字输入
-        editor.insertText("first line", replacementRange: NSRange(location: 0, length: 0))
-        #expect(editor.text == "first line")
-        #expect(editor.lines == ["first line"])
-        #expect(editor.caretColumn == 10)
-
-        // 测试换行
-        editor.insertNewline(nil)
-        #expect(editor.lines == ["first line", ""])
-        #expect(editor.caretLine == 1)
-        #expect(editor.caretColumn == 0)
-
-        // 测试第二行录入
-        editor.insertText("second", replacementRange: NSRange(location: 0, length: 0))
-        #expect(editor.lines == ["first line", "second"])
-        #expect(editor.caretColumn == 6)
-
-        // 测试退格删除与跨行合并
-        for _ in 0..<6 {
-            editor.deleteBackward(nil)
-        }
-        #expect(editor.lines == ["first line", ""])
-        editor.deleteBackward(nil) // 合并回上一行
-        #expect(editor.lines == ["first line"])
-        #expect(editor.caretLine == 0)
-        #expect(editor.caretColumn == 10)
     }
 
     @Test @MainActor func scrollViewWithDiffTextViewRendersTextCorrectly() throws {

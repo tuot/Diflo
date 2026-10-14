@@ -39,7 +39,6 @@ actor InlineDiffWorker {
         return result
     }
 
-    func clearCache() { cache.removeAll(); cacheBytes = 0 }
 
     private nonisolated static func calculate(left: String, right: String) throws -> InlineDiffResult {
         var scalars = 0
