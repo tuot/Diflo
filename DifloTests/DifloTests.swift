@@ -118,9 +118,8 @@ struct DiffTextViewRenderingTests {
         )
         editor.resizeDocument(minimumSize: NSSize(width: 600, height: 400))
 
-        let layoutManager = try #require(editor.layoutManager)
-        let textContainer = try #require(editor.textContainer)
-        let usedRect = layoutManager.usedRect(for: textContainer)
+        let layoutManager = try #require(editor.textLayoutManager)
+        let usedRect = layoutManager.usageBoundsForTextContainer
         #expect(editor.frame.width > 0)
         #expect(editor.frame.height > 0)
         #expect(usedRect.width > 0)
@@ -452,7 +451,7 @@ struct EditableDiffContainerTests {
     @Test @MainActor func standardFactoryRetainsTextSystemAndAcceptsTyping() throws {
         let textView = DiffTextView.createStandard(side: .left)
         #expect(textView.textStorage != nil)
-        #expect(textView.layoutManager != nil)
+        #expect(textView.textLayoutManager != nil)
         #expect(textView.textContainer != nil)
         #expect(textView.isEditable)
         #expect(textView.isSelectable)
@@ -517,12 +516,10 @@ struct EditableDiffContainerTests {
         )
         textView.resizeDocument(minimumSize: scrollView.contentSize)
 
-        let lm = try #require(textView.layoutManager)
-        let tc = try #require(textView.textContainer)
-        let glyphCount = lm.numberOfGlyphs
-        let usedRect = lm.usedRect(for: tc)
+        let lm = try #require(textView.textLayoutManager)
+        let usedRect = lm.usageBoundsForTextContainer
 
-        let rep = scrollView.bitmapImageRepForCachingDisplay(in: scrollView.bounds)!
+        let rep = try #require(scrollView.bitmapImageRepForCachingDisplay(in: scrollView.bounds))
         scrollView.cacheDisplay(in: scrollView.bounds, to: rep)
         var darkCount = 0
         for y in 0..<rep.pixelsHigh {
@@ -533,7 +530,7 @@ struct EditableDiffContainerTests {
                 }
             }
         }
-        #expect(glyphCount > 0)
+        #expect(textView.lineRect(at: 0)?.width ?? 0 > 0)
         #expect(usedRect.height > 0)
         #expect(darkCount > 10, "Text must be drawn onto the scroll view!")
     }

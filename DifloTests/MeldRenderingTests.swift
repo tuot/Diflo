@@ -51,10 +51,8 @@ struct MeldRenderingTests {
     @Test func textRowsMatchGutterAndConnectorHeight() throws {
         let editor = DiffTextView.createStandard(side: .left)
         editor.configure(text: "same\nchanged\nend", lineCount: 3, hunks: [], side: .left, selectedHunkID: nil)
-        let manager = try #require(editor.layoutManager)
-        manager.ensureLayout(for: try #require(editor.textContainer))
-        let first = manager.lineFragmentRect(forGlyphAt: 0, effectiveRange: nil)
-        let second = manager.lineFragmentRect(forGlyphAt: 5, effectiveRange: nil)
+        let first = try #require(editor.lineRect(at: 0))
+        let second = try #require(editor.lineRect(at: 1))
         #expect(abs(second.minY - first.minY - DiffTextView.rowHeight) < 0.1)
     }
 
@@ -62,10 +60,9 @@ struct MeldRenderingTests {
         let editor = DiffTextView.createStandard(side: .left)
         editor.frame = NSRect(x: 0, y: 0, width: 200, height: 120)
         editor.configure(text: String(repeating: "x", count: 200) + "\nend", lineCount: 2, hunks: [], side: .left, selectedHunkID: nil)
-        let manager = try #require(editor.layoutManager)
-        manager.ensureLayout(for: try #require(editor.textContainer))
-        let second = manager.lineFragmentRect(forGlyphAt: 201, effectiveRange: nil)
-        #expect(abs(second.minY - DiffTextView.rowHeight) < 0.1)
+        let second = try #require(editor.lineRect(at: 1))
+        #expect(abs(second.minY - DiffTextView.verticalInset - DiffTextView.rowHeight) < 0.1)
+        #expect(editor.textLayoutManager != nil)
     }
 
     @Test(arguments: [DiffHunk.Kind.modified, .leftOnly, .rightOnly])

@@ -35,25 +35,25 @@ struct DiffDecorationDrawingTests {
         editor.configure(text: lines.joined(separator: "\n"), lineCount: 30, hunks: [hunk],
                          side: .left, selectedHunkID: nil, oppositeLines: Array(repeating: "prefix NEW tail", count: 30))
         editor.resizeDocument(minimumSize: scroll.contentSize)
-        let manager = try #require(editor.layoutManager)
+        _ = try #require(editor.textLayoutManager)
         let offset = editor.lineIndex.utf16Starts[4] + 7
         for _ in 0..<100 {
-            if manager.temporaryAttribute(.backgroundColor, atCharacterIndex: offset, effectiveRange: nil) != nil { break }
+            if inlineBackground(in: editor, at: offset) != nil { break }
             try await Task.sleep(for: .milliseconds(5))
         }
-        #expect(manager.temporaryAttribute(.backgroundColor, atCharacterIndex: offset, effectiveRange: nil) != nil)
+        #expect(inlineBackground(in: editor, at: offset) != nil)
         scroll.contentView.scroll(to: NSPoint(x: 0, y: DiffTextView.rowHeight))
         editor.refreshInlineHighlights()
-        #expect(manager.temporaryAttribute(.backgroundColor, atCharacterIndex: offset, effectiveRange: nil) != nil)
+        #expect(inlineBackground(in: editor, at: offset) != nil)
         let newlyVisibleOffset = editor.lineIndex.utf16Starts[11] + 7
         for _ in 0..<100 {
-            if manager.temporaryAttribute(.backgroundColor, atCharacterIndex: newlyVisibleOffset, effectiveRange: nil) != nil { break }
+            if inlineBackground(in: editor, at: newlyVisibleOffset) != nil { break }
             try await Task.sleep(for: .milliseconds(5))
         }
-        #expect(manager.temporaryAttribute(.backgroundColor, atCharacterIndex: newlyVisibleOffset, effectiveRange: nil) != nil)
-        #expect(manager.temporaryAttribute(.backgroundColor, atCharacterIndex: offset, effectiveRange: nil) != nil)
+        #expect(inlineBackground(in: editor, at: newlyVisibleOffset) != nil)
+        #expect(inlineBackground(in: editor, at: offset) != nil)
         editor.updateDiffHighlights(lineCount: 30, hunks: [], side: .left, selectedHunkID: nil)
-        #expect(manager.temporaryAttribute(.backgroundColor, atCharacterIndex: offset, effectiveRange: nil) == nil)
+        #expect(inlineBackground(in: editor, at: offset) == nil)
     }
 
     @Test func gutterDoesNotPaintOverAdjacentEditors() {

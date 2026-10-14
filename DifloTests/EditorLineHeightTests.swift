@@ -32,7 +32,7 @@ struct EditorLineHeightTests {
     }
 
     @Test func rowHeightStaysCloseToTheFontMetrics() {
-        let naturalHeight = ceil(NSLayoutManager().defaultLineHeight(for: DiffTextView.editorFont))
+        let naturalHeight = ceil(DiffTextView.editorFont.ascender - DiffTextView.editorFont.descender + DiffTextView.editorFont.leading)
         #expect(DiffTextView.rowHeight >= naturalHeight)
         #expect(DiffTextView.rowHeight <= naturalHeight + 3)
     }
@@ -41,7 +41,7 @@ struct EditorLineHeightTests {
         let editor = DiffTextView.createStandard(side: .left)
         let proposed = NSRect(x: 10, y: 8, width: 1, height: 22)
         let caret = editor.fittedInsertionPointRect(proposed)
-        let naturalHeight = ceil(NSLayoutManager().defaultLineHeight(for: DiffTextView.editorFont))
+        let naturalHeight = ceil(DiffTextView.editorFont.ascender - DiffTextView.editorFont.descender + DiffTextView.editorFont.leading)
         #expect(caret.height == naturalHeight)
         #expect(caret.midY == proposed.midY)
         #expect(caret.minX == proposed.minX)

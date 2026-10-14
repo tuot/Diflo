@@ -1,8 +1,10 @@
 import AppKit
+import CoreText
 
 final class DiffTextView: NSTextView {
     static let editorFont = NSFont.monospacedSystemFont(ofSize: 14, weight: .regular)
-    static let rowHeight = ceil(NSLayoutManager().defaultLineHeight(for: editorFont)) + 2
+    static let fontHeight = ceil(editorFont.ascender - editorFont.descender + editorFont.leading)
+    static let rowHeight = fontHeight + 2
     static let verticalInset: CGFloat = 8.0
     static let gutterWidth: CGFloat = 46.0
 
@@ -12,7 +14,9 @@ final class DiffTextView: NSTextView {
                       height: lines.isEmpty ? 2 : CGFloat(lines.count) * rowHeight)
     }
 
-    private var textStorageHolder: NSTextStorage?
+    private var contentStorageHolder: NSTextContentStorage?
+    private var measuredWidth: CGFloat?
+    private var lineWidthCache: [String: CGFloat] = [:]
     private var rowHighlights: [DiffRowPresentation.Highlight] = []
     private var selectedRows: Range<Int>?
     private var emptyHighlights: [(Int, DiffRowPresentation.Highlight)] = []
@@ -20,6 +24,11 @@ final class DiffTextView: NSTextView {
     private let localUndoManager = UndoManager()
     var sharedUndoManager: UndoManager?
     override var undoManager: UndoManager? { sharedUndoManager ?? localUndoManager }
+    // NSTextView's default origin getter can force complete document layout.
+    // This editor pins its unwrapped container to these fixed insets.
+    override var textContainerOrigin: NSPoint {
+        NSPoint(x: textContainerInset.width, y: textContainerInset.height)
+    }
     private(set) var lineIndex = TextLineIndex(normalizedText: "")
     private var indexedText = ""
     private var decorationHunks: [DiffHunk] = []
@@ -28,7 +37,6 @@ final class DiffTextView: NSTextView {
     private let inlineWorker = InlineDiffWorker()
     private var inlineTask: Task<Void, Never>?
     private var inlineGeneration = 0
-    private var inlineRanges: [NSRange] = []
     private var oppositeLines: [String] = []
     private var inlineInputText: String?
     private var inlineInputHunks: [DiffHunk] = []
@@ -77,6 +85,7 @@ final class DiffTextView: NSTextView {
         let text = string
         if indexedText != text {
             indexedText = text
+            measuredWidth = nil
             lineIndex = supplied ?? TextLineIndex(normalizedText: text)
         }
     }
@@ -168,19 +177,9 @@ final class DiffTextView: NSTextView {
     }
 
     static func createStandard(side: ComparisonSide) -> DiffTextView {
-        let textStorage = NSTextStorage()
-        let layoutManager = NSLayoutManager()
-        let textContainer = NSTextContainer(
-            containerSize: NSSize(width: 400, height: CGFloat.greatestFiniteMagnitude)
-        )
-        textStorage.addLayoutManager(layoutManager)
-        layoutManager.addTextContainer(textContainer)
-
-        let textView = DiffTextView(
-            frame: NSRect(x: 0, y: 0, width: 400, height: 600),
-            textContainer: textContainer
-        )
-        textView.textStorageHolder = textStorage
+        let textView = DiffTextView(usingTextLayoutManager: true)
+        textView.frame = NSRect(x: 0, y: 0, width: 400, height: 600)
+        textView.contentStorageHolder = textView.textLayoutManager?.textContentManager as? NSTextContentStorage
         textView.font = Self.editorFont
         textView.textColor = NSColor.textColor
         textView.insertionPointColor = NSColor.controlAccentColor
@@ -189,6 +188,9 @@ final class DiffTextView: NSTextView {
         let paragraph = NSMutableParagraphStyle()
         paragraph.minimumLineHeight = Self.rowHeight
         paragraph.maximumLineHeight = Self.rowHeight
+        paragraph.alignment = .left
+        // Continue the system's 28pt tab stops beyond its finite default list.
+        paragraph.defaultTabInterval = 28
         textView.defaultParagraphStyle = paragraph
         textView.typingAttributes = [.font: textView.font!, .foregroundColor: NSColor.textColor, .paragraphStyle: paragraph]
         textView.isEditable = true
@@ -315,7 +317,8 @@ final class DiffTextView: NSTextView {
         }
         if window?.firstResponder === self {
             let line = lineIndex.line(containingUTF16Offset: selectedRange().location)
-            let band = Self.diffBandRect(for: line..<(line + 1), width: bounds.width).insetBy(dx: 0, dy: 0.5)
+            let row = lineRect(at: line) ?? Self.diffBandRect(for: line..<(line + 1), width: bounds.width)
+            let band = NSRect(x: bounds.minX, y: row.minY, width: bounds.width, height: row.height).insetBy(dx: 0, dy: 0.5)
             if band.intersects(rect) {
                 let dark = effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
                 NSColor.systemYellow.withAlphaComponent(dark ? 0.16 : 0.20).setFill()
@@ -353,12 +356,10 @@ final class DiffTextView: NSTextView {
     }
 
     private func removeInlineHighlights() {
-        let document = NSRange(location: 0, length: (string as NSString).length)
-        for range in inlineRanges {
-            let clipped = NSIntersectionRange(range, document)
-            if clipped.length > 0 { layoutManager?.removeTemporaryAttribute(.backgroundColor, forCharacterRange: clipped) }
-        }
-        inlineRanges = []
+        guard let manager = textLayoutManager, let content = manager.textContentManager else { return }
+        // Rendering ranges move with native edits. Clearing by old NSRange offsets
+        // leaves highlights behind when text is inserted before them.
+        manager.removeRenderingAttribute(.backgroundColor, for: content.documentRange)
     }
 
     func refreshInlineHighlights() {
@@ -413,11 +414,49 @@ final class DiffTextView: NSTextView {
             let isDark = self.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
             let color = isDark ? NSColor(red: 0.14, green: 0.32, blue: 0.49, alpha: 0.9) : NSColor(red: 0.54, green: 0.76, blue: 1, alpha: 0.65)
             for range in ranges where NSMaxRange(range) <= index.utf16Count {
-                self.layoutManager?.addTemporaryAttribute(.backgroundColor, value: color, forCharacterRange: range)
+                if let textRange = self.textRange(for: range) {
+                    self.textLayoutManager?.addRenderingAttribute(.backgroundColor, value: color, for: textRange)
+                }
             }
-            self.inlineRanges = ranges
             self.needsDisplay = true
         }
+    }
+
+    private func textRange(for range: NSRange) -> NSTextRange? {
+        guard range.location != NSNotFound, range.location >= 0, range.length >= 0,
+              NSMaxRange(range) <= (string as NSString).length,
+              let content = textLayoutManager?.textContentManager,
+              let start = content.location(content.documentRange.location, offsetBy: range.location),
+              let end = content.location(start, offsetBy: range.length) else { return nil }
+        return NSTextRange(location: start, end: end)
+    }
+
+    /// TextKit 2 row geometry, with fixed-height geometry for its empty extra row.
+    func lineRect(at line: Int) -> NSRect? {
+        guard lineIndex.utf16Starts.indices.contains(line),
+              let manager = textLayoutManager,
+              let content = manager.textContentManager,
+              let range = textRange(for: NSRange(location: lineIndex.utf16Starts[line], length: 0)) else { return nil }
+        let offset = lineIndex.utf16Starts[line]
+        // Requesting ensuresExtraLineFragment forces layout through the document
+        // end. Its empty row has known geometry because this editor never wraps.
+        if offset == lineIndex.utf16Count {
+            return NSRect(x: textContainerOrigin.x, y: Self.verticalInset + CGFloat(line) * Self.rowHeight,
+                          width: 0, height: Self.rowHeight)
+        }
+        var rect: NSRect?
+        manager.enumerateTextLayoutFragments(from: range.location, options: [.ensuresLayout]) { fragment in
+            let start = content.offset(from: content.documentRange.location, to: fragment.rangeInElement.location)
+            let localOffset = offset - start
+            if let row = fragment.textLineFragments.first(where: {
+                NSLocationInRange(localOffset, $0.characterRange) || ($0.characterRange.length == 0 && localOffset == $0.characterRange.location)
+            }) {
+                rect = row.typographicBounds.offsetBy(dx: fragment.layoutFragmentFrame.minX + self.textContainerOrigin.x,
+                                                     dy: fragment.layoutFragmentFrame.minY + self.textContainerOrigin.y)
+            }
+            return false
+        }
+        return rect
     }
 
     override func mouseDown(with event: NSEvent) {
@@ -426,7 +465,8 @@ final class DiffTextView: NSTextView {
     }
 
     func fittedInsertionPointRect(_ rect: NSRect) -> NSRect {
-        let fontHeight = ceil((layoutManager ?? NSLayoutManager()).defaultLineHeight(for: font ?? Self.editorFont))
+        let font = font ?? Self.editorFont
+        let fontHeight = ceil(font.ascender - font.descender + font.leading)
         let height = min(rect.height, fontHeight)
         return NSRect(x: rect.minX, y: rect.midY - height / 2, width: rect.width, height: height)
     }
@@ -436,17 +476,45 @@ final class DiffTextView: NSTextView {
     }
 
     func resizeDocument(minimumSize: NSSize) {
-        guard let scrollView = enclosingScrollView ?? (superview as? NSClipView)?.superview as? NSScrollView else { return }
-        let viewportSize = scrollView.contentSize
+        let scrollView = enclosingScrollView ?? (superview as? NSClipView)?.superview as? NSScrollView
+        let viewportSize = scrollView?.contentSize ?? minimumSize
         let minHeight = max(minimumSize.height, viewportSize.height, 200)
 
-        guard let textContainer, let layoutManager else { return }
-        layoutManager.ensureLayout(for: textContainer)
-        let usedRect = layoutManager.usedRect(for: textContainer)
-        let newWidth = max(viewportSize.width, ceil(usedRect.maxX + textContainerInset.width * 2), 200)
-        let usedHeight = ceil(usedRect.height + textContainerInset.height * 2)
-        let neededHeight = Self.verticalInset * 2 + CGFloat(max(1, lineCount)) * Self.rowHeight
-        let newHeight = max(minHeight, usedHeight, neededHeight)
+        guard let manager = textLayoutManager else { return }
+        // Seed an initially empty layout cache with just the first row.
+        _ = lineRect(at: 0)
+        // Bounds-based ensureLayout can visit the whole document to discover the
+        // requested Y coordinate. Our fixed rows map the viewport to text directly.
+        let viewport = scrollView?.documentVisibleRect ?? bounds
+        let starts = lineIndex.utf16Starts
+        let first = min(starts.count - 1, max(0, Int(floor((viewport.minY - Self.verticalInset) / Self.rowHeight))))
+        let end = min(starts.count, max(first + 1, Int(ceil((viewport.maxY - Self.verticalInset) / Self.rowHeight)) + 1))
+        let startOffset = starts[first]
+        let endOffset = end < starts.count ? starts[end] : lineIndex.utf16Count
+        if let range = textRange(for: NSRange(location: startOffset, length: endOffset - startOffset)) {
+            manager.ensureLayout(for: range)
+        }
+        let usedRect = manager.usageBoundsForTextContainer
+        if measuredWidth == nil {
+            var currentWidths: [String: CGFloat] = [:]
+            var maximum: CGFloat = 0
+            for line in lineIndex.lines {
+                let width: CGFloat
+                if let cached = currentWidths[line] ?? lineWidthCache[line] {
+                    width = cached
+                } else {
+                    let attributed = NSAttributedString(string: line, attributes: baseAttributes)
+                    width = ceil(CGFloat(CTLineGetTypographicBounds(CTLineCreateWithAttributedString(attributed), nil, nil, nil)))
+                }
+                currentWidths[line] = width
+                maximum = max(maximum, width)
+            }
+            lineWidthCache = currentWidths
+            measuredWidth = maximum
+        }
+        let newWidth = max(viewportSize.width, ceil(usedRect.maxX), measuredWidth ?? 0, 200)
+        let neededHeight = Self.verticalInset * 2 + CGFloat(lineIndex.utf16Starts.count) * Self.rowHeight
+        let newHeight = max(minHeight, neededHeight)
 
         let targetFrame = NSRect(x: 0, y: 0, width: newWidth, height: newHeight)
         if frame != targetFrame {

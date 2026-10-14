@@ -65,6 +65,7 @@ struct EditorSearchTests {
             perform(.previousMatch)
             #expect(editor.selectedRange() == first)
             #expect(editor.string == text)
+            #expect(editor.textLayoutManager != nil)
             perform(.hideFindInterface)
             #expect(!scroll.isFindBarVisible)
         }
