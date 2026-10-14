@@ -110,8 +110,10 @@ final class ChangeGutterView: NSView {
             let hunkColor = color(for: hunk)
 
             let highlight: DiffRowPresentation.Highlight = hunk.kind == .modified ? .modification : (hunk.kind == .leftOnly ? .deletion : .insertion)
-            let editorFill = DiffTextView.backgroundColor(for: highlight, appearance: effectiveAppearance) ?? hunkColor
-            let fill = editorFill.blended(withFraction: isDark ? 0.20 : 0.14, of: hunkColor) ?? editorFill
+            let fill = DiffTextView.backgroundColor(for: highlight, appearance: effectiveAppearance) ?? hunkColor
+            // Match the editor's base as well as its translucent diff fill.
+            NSColor.textBackgroundColor.setFill()
+            path.fill()
             fill.setFill()
             path.fill()
 
