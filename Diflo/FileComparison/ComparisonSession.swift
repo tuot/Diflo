@@ -41,8 +41,8 @@ final class ComparisonSession {
 
     func startSamples() {
         startBlank()
-        leftBuffer = EditorBuffer.blank(named: "测试数据 · 左侧").updatingText(ComparisonSamples.left)
-        rightBuffer = EditorBuffer.blank(named: "测试数据 · 右侧").updatingText(ComparisonSamples.right)
+        leftBuffer = EditorBuffer.blank(named: "测试数据").updatingText(ComparisonSamples.left)
+        rightBuffer = EditorBuffer.blank(named: "测试数据").updatingText(ComparisonSamples.right)
         scheduleComparison(debounced: false)
     }
 

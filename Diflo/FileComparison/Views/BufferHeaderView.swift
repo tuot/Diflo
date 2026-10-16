@@ -7,25 +7,44 @@ struct BufferHeaderView: View {
     let clear: () -> Void
 
     var body: some View {
-        HStack(spacing: 8) {
-            Button("打开\(sideName)文件", systemImage: "folder", action: open)
-                .labelStyle(.iconOnly)
-                .help("打开\(sideName)文件")
-            Text(buffer.displayName + (buffer.isDirty ? " •" : ""))
-                .font(.system(size: 12, weight: .medium))
-                .lineLimit(1)
-                .truncationMode(.middle)
-            Spacer(minLength: 0)
+        Button(action: open) {
+            HStack(spacing: 10) {
+                Image(systemName: "doc.text")
+                    .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
+                Text(buffer.displayName)
+                    .font(.system(size: 13, weight: .medium))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                if buffer.isDirty {
+                    Circle()
+                        .fill(.tint)
+                        .frame(width: 6, height: 6)
+                        .accessibilityHidden(true)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 20)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .help(openHelp)
+        .accessibilityLabel("\(sideName)：\(buffer.displayName)\(buffer.isDirty ? "，未保存" : "")")
+        .accessibilityHint("打开文件，右键显示文件操作")
+        .contextMenu {
+            Button("打开\(sideName)文件…", systemImage: "folder", action: open)
+            Divider()
             Button("清空\(sideName)", systemImage: "eraser", action: clear)
-                .labelStyle(.iconOnly)
-                .help("清空\(sideName)文本，可撤销")
                 .disabled(buffer.text.isEmpty)
         }
-        .controlSize(.small)
-        .padding(.horizontal, 12)
-        .frame(maxWidth: .infinity)
-        .background(Color(nsColor: .controlBackgroundColor))
     }
 
     private var sideName: String { side == .left ? "左侧" : "右侧" }
+
+    private var openHelp: String {
+        let instruction = "点击打开\(sideName)文件 · 右键显示更多操作"
+        guard let url = buffer.url else { return instruction }
+        return "\(url.path(percentEncoded: false))\n\(instruction)"
+    }
 }

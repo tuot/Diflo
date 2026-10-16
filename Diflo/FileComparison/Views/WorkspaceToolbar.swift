@@ -9,34 +9,9 @@ struct WorkspaceToolbar: View {
     let saveRightAs: () -> Void
 
     var body: some View {
-        HStack(spacing: 8) {
-            Button("返回", systemImage: "chevron.left", action: returnToLauncher)
-            Divider().frame(height: 16)
-            Button("上一个差异", systemImage: "chevron.up", action: session.selectPreviousHunk)
-                .labelStyle(.iconOnly)
-                .help("上一个差异 (⌘↑)")
-                .keyboardShortcut(.upArrow, modifiers: [.command])
-                .disabled(session.result?.hunks.isEmpty != false)
-            Button("下一个差异", systemImage: "chevron.down", action: session.selectNextHunk)
-                .labelStyle(.iconOnly)
-                .help("下一个差异 (⌘↓)")
-                .keyboardShortcut(.downArrow, modifiers: [.command])
-                .disabled(session.result?.hunks.isEmpty != false)
-            Spacer()
-            if session.isWorking { ProgressView().controlSize(.small) }
-            Text(summary)
-                .font(.caption.monospacedDigit())
-                .foregroundStyle(.secondary)
-            moreMenu
-        }
-        .controlSize(.small)
-        .padding(.horizontal, 12)
-        .frame(height: 36)
-        .background(.bar)
-    }
-
-    private var moreMenu: some View {
         Menu {
+            Button("新建对比…", systemImage: "square.and.pencil", action: returnToLauncher)
+            Divider()
             Button("保存左侧", action: saveLeft)
                 .keyboardShortcut("s", modifiers: [.command])
             Button("保存右侧", action: saveRight)
@@ -81,12 +56,8 @@ struct WorkspaceToolbar: View {
         }
         .help("更多操作")
         .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
         .fixedSize()
-    }
-
-    private var summary: String {
-        guard let result = session.result else { return "正在比较…" }
-        return result.differenceCount == 0 ? "内容相同" : "\(result.hunks.count) 个差异块"
     }
 
     private func undo() { session.undoManager.undo() }

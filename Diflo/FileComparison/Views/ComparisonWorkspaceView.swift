@@ -12,21 +12,7 @@ struct ComparisonWorkspaceView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // 1. 顶部工具栏 (保证在最高图层)
-            WorkspaceToolbar(
-                session: session,
-                returnToLauncher: requestReturn,
-                saveLeft: { save(.left, saveAs: false) },
-                saveRight: { save(.right, saveAs: false) },
-                saveLeftAs: { save(.left, saveAs: true) },
-                saveRightAs: { save(.right, saveAs: true) }
-            )
-            .frame(maxWidth: .infinity)
-            .zIndex(10)
-
-            Divider().opacity(0.5).zIndex(10)
-
-            // 2. 文件标头栏
+            // 文件标头与编辑器两侧对齐，低频操作通过右键菜单提供。
             HStack(spacing: 0) {
                 BufferHeaderView(
                     buffer: session.leftBuffer,
@@ -35,6 +21,9 @@ struct ComparisonWorkspaceView: View {
                     clear: { clear(.left) }
                 )
                 panelSeparator
+                    .overlay {
+                        DifferenceNavigationView(session: session)
+                    }
                 BufferHeaderView(
                     buffer: session.rightBuffer,
                     side: .right,
@@ -44,13 +33,12 @@ struct ComparisonWorkspaceView: View {
                 Divider().opacity(0.5)
                 Color.clear.frame(width: 12)
             }
-            .frame(height: 38)
-            .background(Color(nsColor: .controlBackgroundColor))
+            .frame(height: 44)
+            .background(.bar)
             .zIndex(10)
 
             Divider().opacity(0.5).zIndex(10)
 
-            // 3. 中间对比工作区：可编辑双栏 + 贝塞尔曲面连线 + Hunk 感知滚动同步
             MeldDualEditorWorkspaceView(
                 session: session,
                 scrollCoordinator: scrollCoordinator,
@@ -61,7 +49,6 @@ struct ComparisonWorkspaceView: View {
 
             Divider().opacity(0.5).zIndex(10)
 
-            // 4. 底部状态栏
             HStack(spacing: 0) {
                 BufferStatusBar(buffer: session.leftBuffer, cursor: cursorPositions[.left] ?? .start)
                 panelSeparator
@@ -69,9 +56,32 @@ struct ComparisonWorkspaceView: View {
                 Divider().opacity(0.5)
                 Color.clear.frame(width: 12)
             }
-            .frame(height: 24)
+            .frame(height: 28)
             .background(.bar)
             .zIndex(10)
+        }
+        .toolbar(removing: .title)
+        .toolbar {
+            if #available(macOS 26.0, *) {
+                ToolbarItem(placement: .principal) {
+                    windowTitle
+                }
+                .sharedBackgroundVisibility(.hidden)
+            } else {
+                ToolbarItem(placement: .principal) {
+                    windowTitle
+                }
+            }
+            ToolbarItem(placement: .primaryAction) {
+                WorkspaceToolbar(
+                    session: session,
+                    returnToLauncher: requestReturn,
+                    saveLeft: { save(.left, saveAs: false) },
+                    saveRight: { save(.right, saveAs: false) },
+                    saveLeftAs: { save(.left, saveAs: true) },
+                    saveRightAs: { save(.right, saveAs: true) }
+                )
+            }
         }
         .confirmationDialog(
             "有未保存的修改",
@@ -91,6 +101,11 @@ struct ComparisonWorkspaceView: View {
         .onChange(of: session.result?.hunks) { _, newHunks in
             scrollCoordinator.updateHunks(newHunks ?? [])
         }
+    }
+
+    private var windowTitle: some View {
+        Text("Diflo")
+            .font(.system(size: 13, weight: .semibold))
     }
 
     private func clear(_ side: ComparisonSide) {
