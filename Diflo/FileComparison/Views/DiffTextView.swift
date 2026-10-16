@@ -134,6 +134,18 @@ final class DiffTextView: NSTextView {
     override var acceptsFirstResponder: Bool { true }
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
+    override func readSelection(from pasteboard: NSPasteboard, type: NSPasteboard.PasteboardType) -> Bool {
+        guard isEditable, !hasMarkedText(), selectedRanges.count == 1,
+              selectedRange() == NSRange(location: 0, length: (string as NSString).length),
+              type == .string || type.rawValue == "NSStringPboardType",
+              let source = pasteboard.string(forType: type),
+              let formatted = PasteFormatter.format(source), formatted != source else {
+            return super.readSelection(from: pasteboard, type: type)
+        }
+        applyUndoableText(formatted, selection: NSRange(location: (formatted as NSString).length, length: 0))
+        return true
+    }
+
     override func cursorUpdate(with event: NSEvent) {
         if let scroll = enclosingScrollView as? DiffOverlayScrollView {
             scroll.updatePointerCursor(with: event)

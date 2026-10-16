@@ -19,10 +19,11 @@ struct ContentView: View {
             didLoadSamples = true
             session.startSamples()
         }
-        .alert("操作失败", isPresented: errorBinding) {
-            Button("好", action: session.dismissError)
-        } message: {
-            Text(session.errorMessage ?? "未知错误")
+        .sheet(isPresented: errorBinding) {
+            IconlessDialog(title: "操作失败", message: Text(session.errorMessage ?? "未知错误")) {
+                Button("好", action: session.dismissError)
+                    .keyboardShortcut(.defaultAction)
+            }
         }
     }
 

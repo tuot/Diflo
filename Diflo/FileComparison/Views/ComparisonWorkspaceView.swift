@@ -9,6 +9,9 @@ struct ComparisonWorkspaceView: View {
         .right: .start
     ]
     @State private var isDiscardConfirmationPresented = false
+    @State private var isReplacementConfirmationPresented = false
+    @State private var pendingReplacementSide: ComparisonSide?
+    @State private var confirmedReplacementSide: ComparisonSide?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -92,15 +95,34 @@ struct ComparisonWorkspaceView: View {
                 )
             }
         }
-        .confirmationDialog(
-            "有未保存的修改",
-            isPresented: $isDiscardConfirmationPresented,
-            titleVisibility: .visible
-        ) {
-            Button("丢弃修改", role: .destructive, action: discardAndReturn)
-            Button("取消", role: .cancel) {}
-        } message: {
-            Text("返回新建页将丢失左右两侧尚未保存的内容。")
+        .sheet(isPresented: $isDiscardConfirmationPresented) {
+            IconlessDialog(
+                title: "有未保存的修改",
+                message: Text("返回新建页将丢失左右两侧尚未保存的内容。")
+            ) {
+                Button("取消", role: .cancel) { isDiscardConfirmationPresented = false }
+                    .keyboardShortcut(.cancelAction)
+                Button("丢弃修改", role: .destructive) {
+                    isDiscardConfirmationPresented = false
+                    discardAndReturn()
+                }
+            }
+        }
+        .sheet(isPresented: $isReplacementConfirmationPresented, onDismiss: openConfirmedReplacement) {
+            if let side = pendingReplacementSide {
+                let buffer = side == .left ? session.leftBuffer : session.rightBuffer
+                IconlessDialog(
+                    title: "替换未保存的内容？",
+                    message: Text("“\(buffer.displayName)”的修改将被丢弃。")
+                ) {
+                    Button("取消", role: .cancel) { isReplacementConfirmationPresented = false }
+                        .keyboardShortcut(.cancelAction)
+                    Button("丢弃并打开", role: .destructive) {
+                        confirmedReplacementSide = side
+                        isReplacementConfirmationPresented = false
+                    }
+                }
+            }
         }
         .onChange(of: session.selectedHunkID) { _, newID in
             if let newID, let hunk = session.result?.hunks.first(where: { $0.id == newID }) {
@@ -152,8 +174,25 @@ struct ComparisonWorkspaceView: View {
     }
 
     private func open(_ side: ComparisonSide) {
-        guard confirmReplacingIfNeeded(side), let url = FilePanel.openTextFile() else { return }
+        let buffer = side == .left ? session.leftBuffer : session.rightBuffer
+        if buffer.isDirty {
+            pendingReplacementSide = side
+            isReplacementConfirmationPresented = true
+        } else {
+            openFile(side)
+        }
+    }
+
+    private func openFile(_ side: ComparisonSide) {
+        guard let url = FilePanel.openTextFile() else { return }
         Task { await session.open(url, for: side) }
+    }
+
+    private func openConfirmedReplacement() {
+        pendingReplacementSide = nil
+        guard let side = confirmedReplacementSide else { return }
+        confirmedReplacementSide = nil
+        openFile(side)
     }
 
     private func save(_ side: ComparisonSide, saveAs: Bool) {
@@ -163,16 +202,5 @@ struct ComparisonWorkspaceView: View {
             : buffer.url
         guard let url else { return }
         Task { await session.save(side, to: url) }
-    }
-
-    private func confirmReplacingIfNeeded(_ side: ComparisonSide) -> Bool {
-        let buffer = side == .left ? session.leftBuffer : session.rightBuffer
-        guard buffer.isDirty else { return true }
-        let alert = NSAlert()
-        alert.messageText = "替换未保存的内容？"
-        alert.informativeText = "“\(buffer.displayName)”的修改将被丢弃。"
-        alert.addButton(withTitle: "取消")
-        alert.addButton(withTitle: "丢弃并打开")
-        return alert.runModal() == .alertSecondButtonReturn
     }
 }
