@@ -4,6 +4,39 @@ import Testing
 
 @MainActor
 struct DiffInteractionTests {
+    @Test func clickingTheSelectedBandDeselectsItAndOtherBandsSwitchSelection() throws {
+        let gutter = ChangeGutterView(frame: NSRect(x: 0, y: 0, width: 88, height: 400))
+        let window = NSWindow(contentRect: gutter.bounds, styleMask: .borderless, backing: .buffered, defer: false)
+        window.contentView = gutter
+        let first = DiffHunk(id: "first", kind: .modified, leftLineRange: 1..<5, rightLineRange: 1..<5,
+                             virtualRowRange: 1..<5, leftRevision: 0, rightRevision: 0)
+        let second = DiffHunk(id: "second", kind: .modified, leftLineRange: 7..<10, rightLineRange: 7..<10,
+                              virtualRowRange: 7..<10, leftRevision: 0, rightRevision: 0)
+        var selected: DiffHunk.ID?
+        var applied = false
+        func refresh() {
+            gutter.configure(hunks: [first, second], selectedHunkID: selected, leftOffset: 0, rightOffset: 0,
+                             select: { selected = $0 }, apply: { _, _ in applied = true })
+        }
+        let firstPoint = NSPoint(x: 44, y: DiffTextView.verticalInset + 3 * DiffTextView.rowHeight)
+        refresh()
+        try click(gutter, at: firstPoint)
+        #expect(selected == first.id)
+        refresh()
+        try click(gutter, at: firstPoint)
+        #expect(selected == nil)
+        refresh()
+        try click(gutter, at: firstPoint)
+        #expect(selected == first.id)
+        refresh()
+        try click(gutter, at: NSPoint(x: 44, y: DiffTextView.verticalInset + 8 * DiffTextView.rowHeight))
+        #expect(selected == second.id)
+        refresh()
+        try click(gutter, at: NSPoint(x: 44, y: DiffTextView.verticalInset + 6 * DiffTextView.rowHeight))
+        #expect(selected == nil)
+        #expect(!applied)
+    }
+
     @Test func horizontalScrollingSynchronizesBothDirectionsWithoutMovingVertically() {
         let left = scrollView(width: 1400, y: 80)
         let right = scrollView(width: 600, y: 120)

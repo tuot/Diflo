@@ -260,19 +260,47 @@ struct LineDiffEngineTests {
 }
 
 struct DiffHunkTests {
-    @Test func keepsReplacementAndExtraLineAsSeparateMergeActions() throws {
+    @Test func groupsReplacementAndExtraLineIntoOneMergeAction() throws {
         let left = EditorBuffer(file: makeFile("left.txt", lines: ["A", "B", "C"]))
         let right = EditorBuffer(file: makeFile("right.txt", lines: ["A", "X", "Y", "C"]))
         let result = LineDiffEngine.compare(left: left.asParsedFile(), right: right.asParsedFile())
         let hunk = try #require(result.hunks.first)
 
-        #expect(result.hunks.count == 2)
+        #expect(result.hunks.count == 1)
         #expect(hunk.kind == .modified)
         #expect(hunk.leftLineRange == 1..<2)
-        #expect(hunk.rightLineRange == 1..<2)
-        #expect(result.hunks[1].kind == .rightOnly)
-        #expect(result.hunks[1].leftLineRange == 2..<2)
-        #expect(result.hunks[1].rightLineRange == 2..<3)
+        #expect(hunk.rightLineRange == 1..<3)
+        #expect(hunk.virtualRowRange == 1..<3)
+    }
+
+    @Test func groupsLargeUnequalReplacementInEitherDirection() throws {
+        let leftLines = (0..<50).map { "旧内容 \($0)" }
+        let rightLines = (0..<1_000).map { "新内容 \($0)" }
+        let left = EditorBuffer(file: makeFile("left.txt", lines: leftLines))
+        let right = EditorBuffer(file: makeFile("right.txt", lines: rightLines))
+
+        for (sourceLeft, sourceRight) in [(left, right), (right, left)] {
+            let result = LineDiffEngine.compare(left: sourceLeft.asParsedFile(), right: sourceRight.asParsedFile())
+            let hunk = try #require(result.hunks.first)
+
+            #expect(result.hunks.count == 1)
+            #expect(hunk.kind == .modified)
+            #expect(hunk.leftLineRange == 0..<sourceLeft.lineCount)
+            #expect(hunk.rightLineRange == 0..<sourceRight.lineCount)
+            #expect(try ApplyHunkCommand.apply(hunk, from: .left, left: sourceLeft, right: sourceRight) == sourceLeft.text)
+            #expect(try ApplyHunkCommand.apply(hunk, from: .right, left: sourceLeft, right: sourceRight) == sourceRight.text)
+        }
+    }
+
+    @Test func unchangedContentSeparatesModifiedBlocks() {
+        let result = LineDiffEngine.compare(
+            left: makeFile("left.txt", lines: ["头", "旧一", "旧二", "共同锚点", "旧三", "尾"]),
+            right: makeFile("right.txt", lines: ["头", "新一", "新二", "新增", "共同锚点", "新三", "尾"])
+        )
+
+        #expect(result.hunks.count == 2)
+        #expect(result.hunks.map(\.leftLineRange) == [1..<3, 4..<5])
+        #expect(result.hunks.map(\.rightLineRange) == [1..<4, 5..<6])
     }
 
     @Test func classifiesLeftAndRightOnlyHunks() throws {
@@ -290,8 +318,8 @@ struct DiffHunkTests {
         let result = LineDiffEngine.compare(left: left.asParsedFile(), right: right.asParsedFile())
         let hunk = try #require(result.hunks.first)
 
-        #expect(try ApplyHunkCommand.apply(hunk, from: .left, left: left, right: right) == "A\nB\nY\nC")
-        #expect(try ApplyHunkCommand.apply(hunk, from: .right, left: left, right: right) == "A\nX\nC")
+        #expect(try ApplyHunkCommand.apply(hunk, from: .left, left: left, right: right) == "A\nB\nC")
+        #expect(try ApplyHunkCommand.apply(hunk, from: .right, left: left, right: right) == "A\nX\nY\nC")
     }
 
     @Test func rejectsAStaleHunk() throws {
@@ -409,8 +437,8 @@ struct ComparisonSessionTests {
     @Test @MainActor func editingRecomputesDiffAndNavigationWraps() async throws {
         let session = ComparisonSession(worker: TestComparisonWorker(files: [:]))
         session.startBlank()
-        session.edit(.left, text: "one\ntwo")
-        session.edit(.right, text: "one\nchanged\nextra")
+        session.edit(.left, text: "one\ntwo\nanchor\nthree")
+        session.edit(.right, text: "one\nchanged\nextra\nanchor\nchanged again")
         try await waitUntil { session.result?.hunks.count == 2 }
 
         #expect(session.result?.hunks.count == 2)

@@ -20,16 +20,10 @@ nonisolated enum DiffHunkBuilder {
             }
 
             let start = index
-            let currentKind = rows[index].kind
 
-            // 对于修改行 (modified)，单行独立拆分为精细 Hunk，方便独立对比与逐行合并
-            if currentKind == .modified {
+            // 连续差异作为一个合并单元，包含不等长替换末尾的增删行。
+            while index < rows.count, rows[index].kind != .unchanged {
                 index += 1
-            } else {
-                // 连续插入或连续删除，聚合为同一个增删块
-                while index < rows.count, rows[index].kind == currentKind {
-                    index += 1
-                }
             }
 
             let leftStart = leftOffset

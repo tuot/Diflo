@@ -5,6 +5,8 @@ struct BufferHeaderView: View {
     let side: ComparisonSide
     let open: () -> Void
     let clear: () -> Void
+    let save: () -> Void
+    let saveAs: () -> Void
 
     var body: some View {
         Button(action: open) {
@@ -34,6 +36,9 @@ struct BufferHeaderView: View {
         .accessibilityHint("打开文件，右键显示文件操作")
         .contextMenu {
             Button("打开\(sideName)文件…", systemImage: "folder", action: open)
+            Divider()
+            Button("保存\(sideName)", systemImage: "square.and.arrow.down", action: save)
+            Button("\(sideName)另存为…", action: saveAs)
             Divider()
             Button("清空\(sideName)", systemImage: "eraser", action: clear)
                 .disabled(buffer.text.isEmpty)

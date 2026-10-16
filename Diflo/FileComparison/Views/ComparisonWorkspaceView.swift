@@ -18,7 +18,9 @@ struct ComparisonWorkspaceView: View {
                     buffer: session.leftBuffer,
                     side: .left,
                     open: { open(.left) },
-                    clear: { clear(.left) }
+                    clear: { clear(.left) },
+                    save: { save(.left, saveAs: false) },
+                    saveAs: { save(.left, saveAs: true) }
                 )
                 panelSeparator
                     .overlay {
@@ -28,7 +30,9 @@ struct ComparisonWorkspaceView: View {
                     buffer: session.rightBuffer,
                     side: .right,
                     open: { open(.right) },
-                    clear: { clear(.right) }
+                    clear: { clear(.right) },
+                    save: { save(.right, saveAs: false) },
+                    saveAs: { save(.right, saveAs: true) }
                 )
                 Divider().opacity(0.5)
                 Color.clear.frame(width: 12)
@@ -47,19 +51,29 @@ struct ComparisonWorkspaceView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .layoutPriority(1)
 
-            Divider().opacity(0.5).zIndex(10)
-
             HStack(spacing: 0) {
                 BufferStatusBar(buffer: session.leftBuffer, cursor: cursorPositions[.left] ?? .start)
-                panelSeparator
+                Color.clear.frame(width: ChangeGutterView.preferredWidth)
                 BufferStatusBar(buffer: session.rightBuffer, cursor: cursorPositions[.right] ?? .start)
-                Divider().opacity(0.5)
                 Color.clear.frame(width: 12)
             }
-            .frame(height: 28)
-            .background(.bar)
+            .frame(height: 30)
+            .background(Color(nsColor: .windowBackgroundColor))
+            .overlay(alignment: .top) {
+                Rectangle()
+                    .fill(Color(nsColor: .separatorColor).opacity(0.35))
+                    .frame(height: 0.5)
+            }
             .zIndex(10)
         }
+        .focusedSceneValue(\.comparisonWorkspaceActions, ComparisonWorkspaceActions(
+            session: session,
+            newComparison: requestReturn,
+            saveLeft: { save(.left, saveAs: false) },
+            saveRight: { save(.right, saveAs: false) },
+            saveLeftAs: { save(.left, saveAs: true) },
+            saveRightAs: { save(.right, saveAs: true) }
+        ))
         .toolbar(removing: .title)
         .toolbar {
             if #available(macOS 26.0, *) {
@@ -74,12 +88,7 @@ struct ComparisonWorkspaceView: View {
             }
             ToolbarItem(placement: .primaryAction) {
                 WorkspaceToolbar(
-                    session: session,
-                    returnToLauncher: requestReturn,
-                    saveLeft: { save(.left, saveAs: false) },
-                    saveRight: { save(.right, saveAs: false) },
-                    saveLeftAs: { save(.left, saveAs: true) },
-                    saveRightAs: { save(.right, saveAs: true) }
+                    returnToLauncher: requestReturn
                 )
             }
         }

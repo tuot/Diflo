@@ -11,6 +11,7 @@ struct DifloApp: App {
         .commands {
             ComparisonUndoCommands()
             ComparisonFindCommands()
+            ComparisonWorkspaceCommands()
         }
     }
 }

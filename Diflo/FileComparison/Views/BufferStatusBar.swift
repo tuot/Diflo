@@ -5,15 +5,22 @@ struct BufferStatusBar: View {
     let cursor: CursorPosition
 
     var body: some View {
-        HStack(spacing: 12) {
-            Text(buffer.encoding.displayName)
-            Text(buffer.lineEnding.displayName)
+        HStack(spacing: 16) {
+            Text("行 \(cursor.line) · 列 \(cursor.column)")
+                .foregroundStyle(.secondary)
+                .layoutPriority(1)
+                .accessibilityLabel("光标位于第 \(cursor.line) 行，第 \(cursor.column) 列")
+
             Spacer(minLength: 8)
-            Text("\(buffer.lineCount) 行")
-            Text("行 \(cursor.line)，列 \(cursor.column)")
+
+            ViewThatFits(in: .horizontal) {
+                Text("\(buffer.lineCount) 行 · \(buffer.encoding.displayName) · \(buffer.lineEnding.displayName)")
+                Text("\(buffer.lineCount) 行")
+            }
+            .foregroundStyle(.tertiary)
+            .help("共 \(buffer.lineCount) 行，编码 \(buffer.encoding.displayName)，换行符 \(buffer.lineEnding.displayName)")
         }
         .font(.system(size: 11).monospacedDigit())
-        .foregroundStyle(.secondary)
         .lineLimit(1)
         .padding(.horizontal, 20)
         .frame(maxWidth: .infinity)

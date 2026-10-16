@@ -202,7 +202,7 @@ final class ChangeGutterView: NSView {
                 apply?(hunk, button.source)
                 return
             } else if bezierPath(for: hunk).contains(point) {
-                select?(hunk.id)
+                select?(selectedHunkID == hunk.id ? nil : hunk.id)
                 return
             }
         }
