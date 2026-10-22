@@ -14,6 +14,65 @@ final class DiffTextView: NSTextView {
                       height: lines.isEmpty ? 2 : CGFloat(lines.count) * rowHeight)
     }
 
+    private(set) var wrapsLines = false
+    private var showsWhitespace = false
+    private var preferredTabWidth = 4
+    var effectiveRowHeight: CGFloat {
+        let font = font ?? Self.editorFont
+        return ceil(font.ascender - font.descender + font.leading) + 2
+    }
+
+    func applyPreferences(fontSize: Double, tabWidth: Int, wrapLines: Bool, showWhitespace: Bool) {
+        guard !hasMarkedText() else { return }
+        let nextFont = NSFont.monospacedSystemFont(ofSize: min(28, max(10, fontSize)), weight: .regular)
+        guard font != nextFont || wrapsLines != wrapLines || showsWhitespace != showWhitespace || preferredTabWidth != tabWidth else { return }
+        font = nextFont
+        wrapsLines = wrapLines
+        showsWhitespace = showWhitespace
+        preferredTabWidth = tabWidth
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.minimumLineHeight = effectiveRowHeight
+        paragraph.maximumLineHeight = effectiveRowHeight
+        paragraph.defaultTabInterval = (" " as NSString).size(withAttributes: [.font: nextFont]).width * CGFloat(tabWidth)
+        paragraph.tabStops = []
+        paragraph.lineBreakMode = wrapLines ? .byWordWrapping : .byClipping
+        defaultParagraphStyle = paragraph
+        textStorage?.addAttributes([.font: nextFont, .paragraphStyle: paragraph], range: NSRange(location: 0, length: (string as NSString).length))
+        typingAttributes = baseAttributes
+        measuredWidth = nil; lineWidthCache.removeAll(); inlineVisibleLines = nil
+        resizeDocument(minimumSize: enclosingScrollView?.contentSize ?? frame.size)
+        needsDisplay = true
+    }
+
+    func lineY(_ line: Int) -> CGFloat {
+        if !wrapsLines { return Self.verticalInset + CGFloat(line) * effectiveRowHeight }
+        if line < lineIndex.utf16Starts.count, let rect = lineRect(at: max(0, line)) { return rect.minY }
+        if let last = lineRect(at: max(0, lineIndex.utf16Starts.count - 1)) { return last.maxY }
+        return Self.verticalInset
+    }
+
+    func bandRect(for lines: Range<Int>, width: CGFloat, offset: CGFloat = 0) -> NSRect {
+        let top = lineY(lines.lowerBound) - offset
+        return NSRect(x: 0, y: lines.isEmpty ? top - 1 : top, width: width,
+                      height: lines.isEmpty ? 2 : max(effectiveRowHeight, lineY(lines.upperBound) - lineY(lines.lowerBound)))
+    }
+
+    private func visibleLogicalLines(in rect: NSRect) -> Range<Int> {
+        let count = lineIndex.utf16Starts.count
+        if !wrapsLines {
+            let first = Int(min(CGFloat(count), max(0, floor((rect.minY - Self.verticalInset) / effectiveRowHeight))))
+            let end = Int(min(CGFloat(count), max(CGFloat(first), ceil((rect.maxY - Self.verticalInset) / effectiveRowHeight) + 1)))
+            return first..<end
+        }
+        func find(_ y: CGFloat) -> Int {
+            var low = 0, high = count
+            while low < high { let middle = (low + high) / 2; if lineY(middle) < y { low = middle + 1 } else { high = middle } }
+            return low
+        }
+        let first = max(0, find(rect.minY) - 1)
+        return first..<min(count, max(first, find(rect.maxY) + 1))
+    }
+
     private var contentStorageHolder: NSTextContentStorage?
     private var measuredWidth: CGFloat?
     private var lineWidthCache: [String: CGFloat] = [:]
@@ -22,6 +81,7 @@ final class DiffTextView: NSTextView {
     private var emptyHighlights: [(Int, DiffRowPresentation.Highlight)] = []
     private var lineCount: Int = 1
     private let localUndoManager = UndoManager()
+    var onFocus: (() -> Void)?
     var sharedUndoManager: UndoManager?
     override var undoManager: UndoManager? { sharedUndoManager ?? localUndoManager }
     // NSTextView's default origin getter can force complete document layout.
@@ -77,7 +137,7 @@ final class DiffTextView: NSTextView {
     }
 
     private var baseAttributes: [NSAttributedString.Key: Any] {
-        [.font: Self.editorFont, .foregroundColor: NSColor.textColor,
+        [.font: font ?? Self.editorFont, .foregroundColor: NSColor.textColor,
          .paragraphStyle: defaultParagraphStyle ?? NSParagraphStyle.default]
     }
 
@@ -135,14 +195,18 @@ final class DiffTextView: NSTextView {
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
     override func readSelection(from pasteboard: NSPasteboard, type: NSPasteboard.PasteboardType) -> Bool {
-        guard isEditable, !hasMarkedText(), selectedRanges.count == 1,
-              selectedRange() == NSRange(location: 0, length: (string as NSString).length),
-              type == .string || type.rawValue == "NSStringPboardType",
-              let source = pasteboard.string(forType: type),
-              let formatted = PasteFormatter.format(source), formatted != source else {
-            return super.readSelection(from: pasteboard, type: type)
-        }
-        applyUndoableText(formatted, selection: NSRange(location: (formatted as NSString).length, length: 0))
+        guard isEditable, !hasMarkedText(), let text = pasteboard.string(forType: type) else { return false }
+        insertText(text, replacementRange: selectedRange())
+        return true
+    }
+
+    @objc func pasteFormatted(_ sender: Any?) { _ = readFormattedSelection(from: .general) }
+    @discardableResult func readFormattedSelection(from pasteboard: NSPasteboard) -> Bool {
+        guard isEditable, !hasMarkedText(), let source = pasteboard.string(forType: .string) else { return false }
+        let text = PasteFormatter.format(source) ?? source
+        if selectedRange() == NSRange(location: 0, length: (string as NSString).length) {
+            applyUndoableText(text, selection: NSRange(location: (text as NSString).length, length: 0))
+        } else { insertText(source, replacementRange: selectedRange()) }
         return true
     }
 
@@ -161,6 +225,7 @@ final class DiffTextView: NSTextView {
 
     override func becomeFirstResponder() -> Bool {
         let accepted = super.becomeFirstResponder()
+        if accepted { onFocus?() }
         needsDisplay = true
         return accepted
     }
@@ -310,12 +375,13 @@ final class DiffTextView: NSTextView {
         defer { NSGraphicsContext.restoreGraphicsState() }
         NSBezierPath(rect: bounds.intersection(rect)).addClip()
         super.drawBackground(in: rect)
-        let first = max(0, Int(floor((rect.minY - Self.verticalInset) / Self.rowHeight)))
-        let end = min(rowHighlights.count, Int(ceil((rect.maxY - Self.verticalInset) / Self.rowHeight)))
+        let visible = visibleLogicalLines(in: rect)
+        let first = min(rowHighlights.count, visible.lowerBound)
+        let end = min(rowHighlights.count, visible.upperBound)
         if first < end {
             for row in first..<end {
                 guard let color = Self.backgroundColor(for: rowHighlights[row], appearance: effectiveAppearance) else { continue }
-                let band = NSRect(x: bounds.minX, y: Self.verticalInset + CGFloat(row) * Self.rowHeight, width: bounds.width, height: Self.rowHeight)
+                let band = bandRect(for: row..<(row + 1), width: bounds.width)
                 color.setFill()
                 band.fill()
                 color.blended(withFraction: 0.25, of: .labelColor)?.setFill()
@@ -338,19 +404,18 @@ final class DiffTextView: NSTextView {
             }
         }
         if let selectedRows, !selectedRows.isEmpty {
-            let block = NSRect(x: bounds.minX, y: Self.verticalInset + CGFloat(selectedRows.lowerBound) * Self.rowHeight,
-                               width: bounds.width, height: CGFloat(selectedRows.count) * Self.rowHeight)
+            let block = bandRect(for: selectedRows, width: bounds.width)
             NSColor.controlAccentColor.setStroke()
             let outline = NSBezierPath(rect: block.insetBy(dx: 0.5, dy: 0.5))
             outline.lineWidth = 1
             outline.stroke()
         }
         for (line, highlight) in emptyHighlights {
-            let y = Self.verticalInset + CGFloat(line) * Self.rowHeight
+            let y = lineY(line)
             guard y >= rect.minY - 2, y <= rect.maxY + 2,
                   let color = Self.backgroundColor(for: highlight, appearance: effectiveAppearance) else { continue }
             color.setFill()
-            let band = Self.diffBandRect(for: line..<line, width: bounds.width)
+            let band = bandRect(for: line..<line, width: bounds.width)
             band.fill()
             let selected = selectedRows?.isEmpty == true && selectedRows?.lowerBound == line
             let edgeHeight: CGFloat = selected ? 1 : 0.5
@@ -358,6 +423,7 @@ final class DiffTextView: NSTextView {
             NSRect(x: band.minX, y: band.minY, width: band.width, height: edgeHeight).fill()
             NSRect(x: band.minX, y: band.maxY - edgeHeight, width: band.width, height: edgeHeight).fill()
         }
+        drawWhitespace(in: rect)
     }
 
     // Only visible changed lines are refined off the main actor. Decorations never edit text storage.
@@ -377,9 +443,10 @@ final class DiffTextView: NSTextView {
     func refreshInlineHighlights() {
         guard !hasMarkedText() else { inlineVisibleLines = nil; return }
         let viewport = visibleRect
-        guard viewport.minY.isFinite, viewport.maxY.isFinite, Self.rowHeight > 0 else { return }
-        let first = Int(min(CGFloat(lineIndex.lines.count), max(0, floor((viewport.minY - Self.verticalInset) / Self.rowHeight))))
-        let end = Int(min(CGFloat(lineIndex.lines.count), max(CGFloat(first), ceil((viewport.maxY - Self.verticalInset) / Self.rowHeight))))
+        guard viewport.minY.isFinite, viewport.maxY.isFinite, effectiveRowHeight > 0 else { return }
+        let logicalVisible = visibleLogicalLines(in: viewport)
+        let first = min(lineIndex.lines.count, logicalVisible.lowerBound)
+        let end = min(lineIndex.lines.count, logicalVisible.upperBound)
         let visible = first..<end
         let text = indexedText
         let inputsChanged = inlineInputText != text || inlineInputHunks != decorationHunks ||
@@ -453,13 +520,19 @@ final class DiffTextView: NSTextView {
         // Requesting ensuresExtraLineFragment forces layout through the document
         // end. Its empty row has known geometry because this editor never wraps.
         if offset == lineIndex.utf16Count {
-            return NSRect(x: textContainerOrigin.x, y: Self.verticalInset + CGFloat(line) * Self.rowHeight,
-                          width: 0, height: Self.rowHeight)
+            let y: CGFloat
+            if wrapsLines && line > 0 { y = lineRect(at: line - 1)?.maxY ?? Self.verticalInset }
+            else { y = Self.verticalInset + CGFloat(line) * effectiveRowHeight }
+            return NSRect(x: textContainerOrigin.x, y: y, width: 0, height: effectiveRowHeight)
         }
         var rect: NSRect?
         manager.enumerateTextLayoutFragments(from: range.location, options: [.ensuresLayout]) { fragment in
             let start = content.offset(from: content.documentRange.location, to: fragment.rangeInElement.location)
             let localOffset = offset - start
+            if self.wrapsLines {
+                rect = fragment.layoutFragmentFrame.offsetBy(dx: self.textContainerOrigin.x, dy: self.textContainerOrigin.y)
+                return false
+            }
             if let row = fragment.textLineFragments.first(where: {
                 NSLocationInRange(localOffset, $0.characterRange) || ($0.characterRange.length == 0 && localOffset == $0.characterRange.location)
             }) {
@@ -469,6 +542,44 @@ final class DiffTextView: NSTextView {
             return false
         }
         return rect
+    }
+
+    @objc func goToLine(_ sender: Any?) {
+        guard let window else { return }
+        let field = NSTextField(string: "")
+        field.placeholderString = "1–\(lineIndex.utf16Starts.count)"
+        field.frame = NSRect(x: 0, y: 0, width: 220, height: 24)
+        let alert = NSAlert()
+        alert.messageText = String(localized: "行号跳转")
+        alert.accessoryView = field
+        alert.addButton(withTitle: "跳转"); alert.addButton(withTitle: "取消")
+        alert.beginSheetModal(for: window) { [weak self] response in
+            guard response == .alertFirstButtonReturn, let self else { return }
+            guard let line = Int(field.stringValue), self.lineIndex.utf16Starts.indices.contains(line - 1) else { NSSound.beep(); return }
+            let range = NSRange(location: self.lineIndex.utf16Starts[line - 1], length: 0)
+            self.setSelectedRange(range); self.scrollRangeToVisible(range)
+            self.window?.makeFirstResponder(self)
+        }
+    }
+
+    private func drawWhitespace(in dirtyRect: NSRect) {
+        guard showsWhitespace, let window else { return }
+        let text = string as NSString
+        let visible = visibleLogicalLines(in: dirtyRect)
+        var remaining = 2_000
+        for line in visible {
+            let start = lineIndex.utf16Starts[line]
+            let end = line + 1 < lineIndex.utf16Starts.count ? lineIndex.utf16Starts[line + 1] : text.length
+            for offset in start..<end where remaining > 0 {
+                let character = text.character(at: offset)
+                guard character == 32 || character == 9 else { continue }
+                remaining -= 1
+                let screenRect = firstRect(forCharacterRange: NSRange(location: offset, length: 1), actualRange: nil)
+                let rect = convert(window.convertFromScreen(screenRect), from: nil)
+                guard rect.intersects(dirtyRect) else { continue }
+                (character == 9 ? "→" : "·" as NSString).draw(at: NSPoint(x: rect.minX, y: rect.minY), withAttributes: [.font: font ?? Self.editorFont, .foregroundColor: NSColor.tertiaryLabelColor])
+            }
+        }
     }
 
     override func mouseDown(with event: NSEvent) {
@@ -491,6 +602,19 @@ final class DiffTextView: NSTextView {
         let scrollView = enclosingScrollView ?? (superview as? NSClipView)?.superview as? NSScrollView
         let viewportSize = scrollView?.contentSize ?? minimumSize
         let minHeight = max(minimumSize.height, viewportSize.height, 200)
+        if wrapsLines {
+            let width = max(40, viewportSize.width)
+            textContainer?.containerSize = NSSize(width: width, height: CGFloat.greatestFiniteMagnitude)
+            if let manager = textLayoutManager, let content = manager.textContentManager {
+                manager.ensureLayout(for: content.documentRange)
+                let height = max(minHeight, manager.usageBoundsForTextContainer.maxY + Self.verticalInset * 2)
+                let target = NSRect(x: 0, y: 0, width: width, height: height)
+                if frame != target { frame = target }
+            }
+            refreshInlineHighlights()
+            return
+        }
+        textContainer?.containerSize = NSSize(width: 10_000_000, height: CGFloat.greatestFiniteMagnitude)
 
         guard let manager = textLayoutManager else { return }
         // Seed an initially empty layout cache with just the first row.
@@ -499,8 +623,8 @@ final class DiffTextView: NSTextView {
         // requested Y coordinate. Our fixed rows map the viewport to text directly.
         let viewport = scrollView?.documentVisibleRect ?? bounds
         let starts = lineIndex.utf16Starts
-        let first = min(starts.count - 1, max(0, Int(floor((viewport.minY - Self.verticalInset) / Self.rowHeight))))
-        let end = min(starts.count, max(first + 1, Int(ceil((viewport.maxY - Self.verticalInset) / Self.rowHeight)) + 1))
+        let first = min(starts.count - 1, max(0, Int(floor((viewport.minY - Self.verticalInset) / effectiveRowHeight))))
+        let end = min(starts.count, max(first + 1, Int(ceil((viewport.maxY - Self.verticalInset) / effectiveRowHeight)) + 1))
         let startOffset = starts[first]
         let endOffset = end < starts.count ? starts[end] : lineIndex.utf16Count
         if let range = textRange(for: NSRange(location: startOffset, length: endOffset - startOffset)) {
@@ -525,7 +649,7 @@ final class DiffTextView: NSTextView {
             measuredWidth = maximum
         }
         let newWidth = max(viewportSize.width, ceil(usedRect.maxX), measuredWidth ?? 0, 200)
-        let neededHeight = Self.verticalInset * 2 + CGFloat(lineIndex.utf16Starts.count) * Self.rowHeight
+        let neededHeight = Self.verticalInset * 2 + CGFloat(lineIndex.utf16Starts.count) * effectiveRowHeight
         let newHeight = max(minHeight, neededHeight)
 
         let targetFrame = NSRect(x: 0, y: 0, width: newWidth, height: newHeight)

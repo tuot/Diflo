@@ -1,6 +1,7 @@
 import AppKit
 
 final class DiffOverviewView: NSView {
+    weak var editor: DiffTextView?
     private var hunks: [DiffHunk] = []
     private var totalRows = 1
     private var selectedHunkID: DiffHunk.ID?
@@ -14,7 +15,7 @@ final class DiffOverviewView: NSView {
     override var isFlipped: Bool { true }
 
     private var documentHeight: CGFloat {
-        max(bounds.height, DiffTextView.verticalInset * 2 + CGFloat(totalRows) * DiffTextView.rowHeight)
+        max(bounds.height, editor?.bounds.height ?? (DiffTextView.verticalInset * 2 + CGFloat(totalRows) * DiffTextView.rowHeight))
     }
 
     var viewportRect: NSRect {
@@ -51,8 +52,9 @@ final class DiffOverviewView: NSView {
         dirtyRect.fill()
 
         for hunk in hunks {
-            let y = (DiffTextView.verticalInset + CGFloat(hunk.rightLineRange.lowerBound) * DiffTextView.rowHeight) / max(1, documentHeight) * bounds.height
-            let height = max(3, CGFloat(hunk.rightLineRange.count) * DiffTextView.rowHeight / max(1, documentHeight) * bounds.height)
+            let band = editor?.bandRect(for: hunk.rightLineRange, width: bounds.width) ?? DiffTextView.diffBandRect(for: hunk.rightLineRange, width: bounds.width)
+            let y = band.minY / max(1, documentHeight) * bounds.height
+            let height = max(3, band.height / max(1, documentHeight) * bounds.height)
             color(for: hunk).setFill()
             NSBezierPath(roundedRect: NSRect(x: 2, y: y, width: bounds.width - 4, height: height), xRadius: 1.5, yRadius: 1.5).fill()
             if hunk.id == selectedHunkID {

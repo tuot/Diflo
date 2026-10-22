@@ -44,6 +44,7 @@ struct DifferenceNavigationView: View {
         .controlSize(.small)
         .padding(.horizontal, 2)
         .frame(width: ChangeGutterView.preferredWidth - 8, height: 28)
+        .help(session.result?.statusDescription ?? "正在比较")
         .accessibilityIdentifier("差异导航")
     }
 
@@ -57,14 +58,14 @@ struct DifferenceNavigationView: View {
 
     private var summary: String {
         guard !session.isWorking, let result = session.result else { return "正在比较" }
-        guard !result.hunks.isEmpty else { return "相同" }
+        guard !result.hunks.isEmpty else { return "文本相同" }
         guard let selectedIndex else { return "–/\(result.hunks.count)" }
         return "\(selectedIndex + 1)/\(result.hunks.count)"
     }
 
     private var accessibilitySummary: String {
         guard !session.isWorking, let result = session.result else { return "正在比较" }
-        guard !result.hunks.isEmpty else { return "内容相同" }
+        guard !result.hunks.isEmpty else { return result.statusDescription }
         guard let selectedIndex else { return "共 \(result.hunks.count) 处差异，尚未选择" }
         return "第 \(selectedIndex + 1) 处差异，共 \(result.hunks.count) 处"
     }

@@ -14,4 +14,5 @@ nonisolated struct DiffHunk: Identifiable, Equatable, Sendable {
     let virtualRowRange: Range<Int>
     let leftRevision: Int
     let rightRevision: Int
+    var isTrailingNewline: Bool = false
 }

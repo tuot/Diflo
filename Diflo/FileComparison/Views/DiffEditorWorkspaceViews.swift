@@ -20,6 +20,10 @@ struct MeldDualEditorWorkspaceView: View {
                 onEdit: { session.edit(.left, text: $0) },
                 onCursorChanged: { onCursorChanged(.left, $0) },
                 onTextEdit: { session.edit(.left, edit: $0) },
+                isInteractionLocked: session.isInteractionLocked,
+                initialCursor: session.cursors[.left],
+                preferences: EditorPreferences.shared,
+                onFocus: { session.activeSide = .left },
                 sharedUndoManager: session.undoManager
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -45,6 +49,10 @@ struct MeldDualEditorWorkspaceView: View {
                 onEdit: { session.edit(.right, text: $0) },
                 onCursorChanged: { onCursorChanged(.right, $0) },
                 onTextEdit: { session.edit(.right, edit: $0) },
+                isInteractionLocked: session.isInteractionLocked,
+                initialCursor: session.cursors[.right],
+                preferences: EditorPreferences.shared,
+                onFocus: { session.activeSide = .right },
                 sharedUndoManager: session.undoManager
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)

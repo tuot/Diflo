@@ -28,6 +28,7 @@ struct DiffOverviewRepresentable: NSViewRepresentable {
 
 
     private func configure(_ view: DiffOverviewView) {
+        view.editor = coordinator.rightScrollView?.documentView as? DiffTextView
         view.configure(
             hunks: hunks,
             totalRows: totalRows,

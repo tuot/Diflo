@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct BufferHeaderView: View {
     let buffer: EditorBuffer
@@ -7,6 +8,7 @@ struct BufferHeaderView: View {
     let clear: () -> Void
     let save: () -> Void
     let saveAs: () -> Void
+    var onDropURL: ((URL) -> Void)? = nil
 
     var body: some View {
         Button(action: open) {
@@ -14,6 +16,7 @@ struct BufferHeaderView: View {
                 Image(systemName: "doc.text")
                     .foregroundStyle(.secondary)
                     .accessibilityHidden(true)
+                if buffer.isReadOnly { Image(systemName: "lock").accessibilityLabel("只读") }
                 Text(buffer.displayName)
                     .font(.system(size: 13, weight: .medium))
                     .lineLimit(1)
@@ -34,6 +37,13 @@ struct BufferHeaderView: View {
         .help(openHelp)
         .accessibilityLabel("\(sideName)：\(buffer.displayName)\(buffer.isDirty ? "，未保存" : "")")
         .accessibilityHint("打开文件，右键显示文件操作")
+        .onDrop(of: [.fileURL], isTargeted: nil) { providers in
+            guard let provider = providers.first, let onDropURL else { return false }
+            _ = provider.loadObject(ofClass: URL.self) { url, _ in
+                if let url { Task { @MainActor in onDropURL(url) } }
+            }
+            return true
+        }
         .contextMenu {
             Button("打开\(sideName)文件…", systemImage: "folder", action: open)
             Divider()

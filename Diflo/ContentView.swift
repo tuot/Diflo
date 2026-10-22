@@ -1,23 +1,30 @@
 import SwiftUI
 
 struct ContentView: View {
-    @State private var session = ComparisonSession()
-    @State private var didLoadSamples = false
+    @State private var session: ComparisonSession
+    @State private var fileActions: ComparisonFileActions
+
+    init() {
+        let session = ComparisonSession()
+        session.enablePersistence(.shared)
+        _session = State(initialValue: session)
+        _fileActions = State(initialValue: ComparisonFileActions(session: session))
+    }
 
     var body: some View {
         Group {
             if session.isWorkspacePresented {
-                ComparisonView(session: session)
+                ComparisonWorkspaceView(session: session, fileActions: fileActions)
             } else {
-                NewComparisonView(session: session)
+                NewComparisonView(session: session, fileActions: fileActions)
             }
         }
+        .disabled(session.isInteractionLocked)
         .frame(minWidth: 920, maxWidth: .infinity, minHeight: 600, maxHeight: .infinity)
         .focusedSceneValue(\.comparisonUndoManager, session.isWorkspacePresented ? session.undoManager : nil)
-        .onAppear {
-            guard !didLoadSamples else { return }
-            didLoadSamples = true
-            session.startSamples()
+        .background(ComparisonWindowBridge(actions: fileActions))
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            Task { await fileActions.checkExternalChanges() }
         }
         .alert("操作失败", isPresented: errorBinding) {
             Button("好", action: session.dismissError)

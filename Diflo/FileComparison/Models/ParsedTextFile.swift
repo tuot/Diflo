@@ -9,5 +9,6 @@ nonisolated struct ParsedTextFile: Equatable, Sendable {
     var normalizedText: String = ""
     var encoding: TextEncoding = .utf8
     var lineEnding: LineEnding = .lf
+    var originalSeparators: [LineEnding] = []
     var lastKnownModificationDate: Date? = nil
 }

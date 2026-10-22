@@ -28,6 +28,15 @@ nonisolated struct DiffResult: Equatable, Sendable {
         self.rightRevision = rightRevision
     }
 
+    var statusDescription: String {
+        if precision == .coarse { return "粗略比较：合并范围可能扩大" }
+        if hasTrailingNewlineDifference { return "末尾换行不同" }
+        if hunks.isEmpty {
+            return options == .default ? "文本相同" : "按当前忽略规则相同"
+        }
+        return "共 \(hunks.count) 处差异"
+    }
+
     var insertedCount: Int {
         rows.count { $0.kind == .inserted }
     }

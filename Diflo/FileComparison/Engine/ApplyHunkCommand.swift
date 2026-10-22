@@ -18,6 +18,10 @@ nonisolated enum ApplyHunkCommand {
 
         let sourceBuffer = source == .left ? left : right
         let targetBuffer = source == .left ? right : left
+        if hunk.isTrailingNewline {
+            if sourceBuffer.hasTrailingNewline == targetBuffer.hasTrailingNewline { return targetBuffer.text }
+            return sourceBuffer.hasTrailingNewline ? targetBuffer.text + "\n" : String(targetBuffer.text.dropLast())
+        }
         let sourceRange = source == .left ? hunk.leftLineRange : hunk.rightLineRange
         let targetRange = source == .left ? hunk.rightLineRange : hunk.leftLineRange
 

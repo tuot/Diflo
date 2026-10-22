@@ -26,7 +26,8 @@ final class DifloUITests: XCTestCase {
     @MainActor
     func testBlankComparisonOpensEditableTwoPaneWorkspace() throws {
         let app = XCUIApplication()
-        app.launchArguments = ["-ApplePersistenceIgnoreState", "YES"]
+        app.launchArguments = ["-ApplePersistenceIgnoreState", "YES", "-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN", "-diflo-ui-testing", "-editor.fontSize", "14", "-editor.wrapLines", "NO"]
+        app.launchEnvironment["DIFLO_TEST_SESSION"] = UUID().uuidString
         app.launch()
         app.activate()
 
@@ -34,8 +35,8 @@ final class DifloUITests: XCTestCase {
         XCTAssertTrue(blankComparison.waitForExistence(timeout: 3))
         blankComparison.click()
 
-        XCTAssertTrue(app.buttons["返回"].waitForExistence(timeout: 3))
-        XCTAssertFalse(app.staticTexts["新建对比"].exists)
+        XCTAssertTrue(app.buttons["新建对比"].waitForExistence(timeout: 3))
+        XCTAssertFalse(app.buttons["空白对比"].exists)
         XCTAssertTrue(app.staticTexts["左侧未命名"].exists)
         XCTAssertTrue(app.staticTexts["右侧未命名"].exists)
         let leftEditor = app.textViews["左侧文件内容"]
@@ -62,10 +63,28 @@ final class DifloUITests: XCTestCase {
             "右侧文本值已更新，但字形没有绘制出来"
         )
         XCTAssertGreaterThan(
-            darkPixelRatio(in: app.buttons["返回"].screenshot()),
+            darkPixelRatio(in: app.buttons["新建对比"].screenshot()),
             0.01,
             "返回按钮虽然存在于控件树中，但被白色编辑器遮住了"
         )
+    }
+
+    @MainActor
+    func testClosingDirtyWindowCanBeCancelled() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN", "-diflo-ui-testing"]
+        app.launchEnvironment["DIFLO_TEST_SESSION"] = UUID().uuidString
+        app.launch()
+        app.buttons["空白对比"].click()
+        let editor = app.textViews["左侧文件内容"]
+        XCTAssertTrue(editor.waitForExistence(timeout: 3))
+        editor.click()
+        editor.typeText("keep this draft")
+        app.typeKey("w", modifierFlags: .command)
+        let cancel = app.buttons["取消"]
+        XCTAssertTrue(cancel.waitForExistence(timeout: 3))
+        cancel.click()
+        XCTAssertEqual(editor.value as? String, "keep this draft")
     }
 
     private func darkPixelRatio(in screenshot: XCUIScreenshot) -> Double {

@@ -1,6 +1,6 @@
 import Foundation
 
-nonisolated struct CursorPosition: Equatable, Sendable {
+nonisolated struct CursorPosition: Equatable, Sendable, Codable {
     let line: Int
     let column: Int
 

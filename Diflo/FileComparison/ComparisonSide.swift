@@ -1,6 +1,6 @@
 import Foundation
 
-nonisolated enum ComparisonSide: Hashable, Sendable {
+nonisolated enum ComparisonSide: String, Hashable, Sendable, Codable {
     case left
     case right
 }

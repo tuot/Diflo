@@ -27,6 +27,7 @@ nonisolated enum LineParser {
             normalizedText: normalized,
             encoding: encoding,
             lineEnding: LineEnding.detect(in: text),
+            originalSeparators: FileTextFormat.separators(in: text),
             lastKnownModificationDate: lastKnownModificationDate
         )
     }

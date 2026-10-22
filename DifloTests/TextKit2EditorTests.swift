@@ -91,10 +91,23 @@ struct TextKit2EditorTests {
             return false
         }
         let rect = try #require(segment)
-        let bitmap = try #require(editor.bitmapImageRepForCachingDisplay(in: editor.bounds))
-        editor.cacheDisplay(in: editor.bounds, to: bitmap)
-        let highlighted = try #require(bitmap.colorAt(x: Int(rect.midX), y: Int(editor.bounds.height - rect.maxY + 2))?.usingColorSpace(.sRGB))
-        #expect(highlighted.blueComponent > highlighted.redComponent + 0.1)
+        let captureBounds = editor.bounds
+        let bitmap = try #require(editor.bitmapImageRepForCachingDisplay(in: captureBounds))
+        editor.cacheDisplay(in: captureBounds, to: bitmap)
+        // cacheDisplay produces backing pixels; the editor geometry is in points.
+        let scaleX = CGFloat(bitmap.pixelsWide) / captureBounds.width
+        let scaleY = CGFloat(bitmap.pixelsHigh) / captureBounds.height
+        var highlightedPixels = 0
+        let minX = max(0, Int(rect.minX * scaleX)), maxX = min(bitmap.pixelsWide, Int(rect.maxX * scaleX))
+        let minY = max(0, Int(rect.minY * scaleY)), maxY = min(bitmap.pixelsHigh, Int(rect.maxY * scaleY))
+        for y in minY..<maxY {
+            for x in minX..<maxX {
+                if let color = bitmap.colorAt(x: x, y: y)?.usingColorSpace(.sRGB), color.blueComponent > color.redComponent + 0.1 {
+                    highlightedPixels += 1
+                }
+            }
+        }
+        #expect(highlightedPixels > (maxX - minX) * (maxY - minY) / 10)
         editor.updateDiffHighlights(lineCount: 1, hunks: [], side: .left, selectedHunkID: nil)
         #expect(inlineBackground(in: editor, at: offset) == nil)
         #expect(!history.canUndo)

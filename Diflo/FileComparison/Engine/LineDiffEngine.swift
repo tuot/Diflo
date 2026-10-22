@@ -54,7 +54,15 @@ nonisolated enum LineDiffEngine {
     }
 
     static func result(left: ParsedTextFile, right: ParsedTextFile, leftRevision: Int, rightRevision: Int, options: ComparisonOptions, rows: [DiffRow], precision: DiffPrecision) -> DiffResult {
-        DiffResult(leftFile: left, rightFile: right, rows: rows, hasTrailingNewlineDifference: left.hasTrailingNewline != right.hasTrailingNewline, hunks: DiffHunkBuilder.build(rows: rows, leftRevision: leftRevision, rightRevision: rightRevision), precision: precision, options: options, leftRevision: leftRevision, rightRevision: rightRevision)
+        var hunks = DiffHunkBuilder.build(rows: rows, leftRevision: leftRevision, rightRevision: rightRevision)
+        if left.hasTrailingNewline != right.hasTrailingNewline {
+            hunks.append(DiffHunk(id: "\(leftRevision):\(rightRevision):eof", kind: .modified,
+                                  leftLineRange: left.lines.count..<left.lines.count,
+                                  rightLineRange: right.lines.count..<right.lines.count,
+                                  virtualRowRange: rows.count..<rows.count,
+                                  leftRevision: leftRevision, rightRevision: rightRevision, isTrailingNewline: true))
+        }
+        return DiffResult(leftFile: left, rightFile: right, rows: rows, hasTrailingNewlineDifference: left.hasTrailingNewline != right.hasTrailingNewline, hunks: hunks, precision: precision, options: options, leftRevision: leftRevision, rightRevision: rightRevision)
     }
 
     private static func assemble(left: ParsedTextFile, right: ParsedTextFile, leftRevision: Int, rightRevision: Int, options: ComparisonOptions, blocks: [DiffBlock], precision: DiffPrecision) -> DiffResult {

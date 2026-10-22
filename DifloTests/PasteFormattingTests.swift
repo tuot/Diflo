@@ -8,7 +8,7 @@ struct PasteFormattingTests {
         let board = NSPasteboard.withUniqueName()
         defer { board.releaseGlobally() }
         board.setString(text, forType: .string)
-        return editor.readSelection(from: board, type: .string)
+        return editor.readFormattedSelection(from: board)
     }
 
     @Test func wholeDocumentPasteFormatsAndUndoRestoresSelection() {
@@ -42,13 +42,13 @@ struct PasteFormattingTests {
         #expect(editor.string == #"prefix: {"a":1}"#)
     }
 
-    @Test func nativePasteboardDispatchFormatsPlainText() {
+    @Test func nativePasteboardDispatchPreservesPlainText() {
         let editor = DiffTextView.createStandard(side: .left)
         let board = NSPasteboard.withUniqueName()
         defer { board.releaseGlobally() }
         board.setString(#"{"text":"你好🌟"}"#, forType: .string)
         #expect(editor.readSelection(from: board))
-        #expect(editor.string == "{\n  \"text\": \"你好🌟\"\n}")
+        #expect(editor.string == #"{"text":"你好🌟"}"#)
     }
 
     @Test func formattingPreservesTokensAndSensitiveMarkup() {

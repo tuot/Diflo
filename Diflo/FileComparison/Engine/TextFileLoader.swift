@@ -4,7 +4,7 @@ nonisolated enum TextFileLoader {
     private static let maximumByteCount = 10 * 1_024 * 1_024
     private static let maximumLineCount = 20_000
 
-    static func load(from url: URL) throws -> ParsedTextFile {
+    static func load(from url: URL, encodingOverride: TextEncoding? = nil) throws -> ParsedTextFile {
         let hasSecurityScope = url.startAccessingSecurityScopedResource()
         defer {
             if hasSecurityScope {
@@ -13,7 +13,9 @@ nonisolated enum TextFileLoader {
         }
 
         do {
-            let values = try url.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey, .contentModificationDateKey])
+            var metadataURL = url
+            metadataURL.removeAllCachedResourceValues()
+            let values = try metadataURL.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey, .contentModificationDateKey])
             guard values.isRegularFile != false else {
                 throw TextFileLoadingError.unreadable
             }
@@ -26,7 +28,14 @@ nonisolated enum TextFileLoader {
                 throw TextFileLoadingError.fileTooLarge
             }
 
-            let decoded = try decode(data)
+            let decoded: (text: String, encoding: TextEncoding)
+            if let encodingOverride {
+                let body = data.starts(with: encodingOverride.byteOrderMark) ? data.dropFirst(encodingOverride.byteOrderMark.count) : data[...]
+                guard let text = String(data: body, encoding: String.Encoding(rawValue: encodingOverride.rawValue)) else {
+                    throw TextFileLoadingError.unsupportedEncoding
+                }
+                decoded = (text, encodingOverride)
+            } else { decoded = try decode(data) }
             let file = LineParser.parse(
                 decoded.text,
                 url: url,
@@ -49,7 +58,7 @@ nonisolated enum TextFileLoader {
             guard let text = String(data: Data(data.dropFirst(3)), encoding: .utf8) else {
                 throw TextFileLoadingError.unsupportedEncoding
             }
-            return (text, .utf8)
+            return (text, .utf8BOM)
         }
 
         if data.starts(with: [0xFF, 0xFE]) {

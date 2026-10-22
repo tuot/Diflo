@@ -18,6 +18,8 @@ final class DualScrollCoordinator: NSObject {
     private var rightHorizontalOffset: CGFloat = 0
 
     func geometryChanged() {
+        gutterView?.needsDisplay = true
+        overviewView?.needsDisplay = true
         if let scroll = rightScrollView, let document = scroll.documentView {
             let height = max(1, document.bounds.height)
             let travel = max(0, height - scroll.contentSize.height)
@@ -106,16 +108,19 @@ final class DualScrollCoordinator: NSObject {
         if sourceMax > 0, sourceY >= sourceMax { return targetMax + (sourceY - sourceMax) }
         guard sourceMax > 0 else { return 0 }
 
-        let rowHeight = DiffTextView.rowHeight
-        let inset = DiffTextView.verticalInset
+        let sourceEditor = (sourceIsLeft ? leftScrollView : rightScrollView)?.documentView as? DiffTextView
+        let targetEditor = (sourceIsLeft ? rightScrollView : leftScrollView)?.documentView as? DiffTextView
+        func position(_ line: Int, editor: DiffTextView?) -> Double {
+            Double(editor?.lineY(line) ?? (DiffTextView.verticalInset + CGFloat(line) * DiffTextView.rowHeight))
+        }
         var transitions: [(sourceStart: Double, sourceEnd: Double, targetStart: Double, targetEnd: Double)] = []
         for hunk in hunks {
             let source = sourceIsLeft ? hunk.leftLineRange : hunk.rightLineRange
             let target = sourceIsLeft ? hunk.rightLineRange : hunk.leftLineRange
-            let start = min(sourceMax, max(0, inset + Double(source.lowerBound) * rowHeight - sourceViewport / 2))
-            let end = min(sourceMax, max(0, inset + Double(source.upperBound) * rowHeight + sourceViewport / 2))
-            let targetStart = min(targetMax, max(0, inset + Double(target.lowerBound) * rowHeight - targetViewport / 2))
-            let targetEnd = min(targetMax, max(0, inset + Double(target.upperBound) * rowHeight + targetViewport / 2))
+            let start = min(sourceMax, max(0, position(source.lowerBound, editor: sourceEditor) - sourceViewport / 2))
+            let end = min(sourceMax, max(0, position(source.upperBound, editor: sourceEditor) + sourceViewport / 2))
+            let targetStart = min(targetMax, max(0, position(target.lowerBound, editor: targetEditor) - targetViewport / 2))
+            let targetEnd = min(targetMax, max(0, position(target.upperBound, editor: targetEditor) + targetViewport / 2))
             // Nearby transitions share one interval; overlapping anchors would reverse the mapping.
             if let previous = transitions.last, start <= previous.sourceEnd || targetStart <= previous.targetEnd {
                 transitions[transitions.count - 1].sourceEnd = max(previous.sourceEnd, end)
@@ -166,7 +171,7 @@ final class DualScrollCoordinator: NSObject {
 
     private func scrollTo(scrollView: NSScrollView, line: Int) {
         var point = scrollView.contentView.bounds.origin
-        point.y = max(0, DiffTextView.verticalInset + Double(line) * DiffTextView.rowHeight - 80)
+        point.y = max(0, ((scrollView.documentView as? DiffTextView)?.lineY(line) ?? (DiffTextView.verticalInset + Double(line) * DiffTextView.rowHeight)) - 80)
         scrollView.contentView.animator().setBoundsOrigin(point)
         scrollView.reflectScrolledClipView(scrollView.contentView)
     }

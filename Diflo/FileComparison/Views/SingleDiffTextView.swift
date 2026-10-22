@@ -13,6 +13,10 @@ struct SingleDiffTextView: NSViewRepresentable {
     let onEdit: (String) -> Void
     let onCursorChanged: (CursorPosition) -> Void
     var onTextEdit: ((TextEdit) -> Void)? = nil
+    var isInteractionLocked = false
+    var initialCursor: CursorPosition? = nil
+    var preferences: EditorPreferences? = nil
+    var onFocus: (() -> Void)? = nil
     var sharedUndoManager: UndoManager? = nil
 
     func makeCoordinator() -> ViewCoordinator {
@@ -23,6 +27,9 @@ struct SingleDiffTextView: NSViewRepresentable {
         let scrollView = DiffOverlayScrollView()
         let textView = DiffTextView.createStandard(side: side)
         textView.sharedUndoManager = sharedUndoManager
+        if let preferences {
+            textView.applyPreferences(fontSize: preferences.fontSize, tabWidth: preferences.tabWidth, wrapLines: preferences.wrapLines, showWhitespace: preferences.showWhitespace)
+        }
 
         scrollView.documentView = textView
         scrollView.findBarPosition = .aboveContent
@@ -69,6 +76,9 @@ struct SingleDiffTextView: NSViewRepresentable {
 
     func updateNSView(_ containerView: DiffEditorContainerView, context: Context) {
         context.coordinator.parent = self
+        if let preferences {
+            (containerView.scrollView.documentView as? DiffTextView)?.applyPreferences(fontSize: preferences.fontSize, tabWidth: preferences.tabWidth, wrapLines: preferences.wrapLines, showWhitespace: preferences.showWhitespace)
+        }
         let scrollView = containerView.scrollView
         scrollView.tile()
         context.coordinator.configure(
@@ -113,6 +123,8 @@ struct SingleDiffTextView: NSViewRepresentable {
                 return
             }
 
+            textView.isEditable = !buffer.isReadOnly && !parent.isInteractionLocked
+            textView.onFocus = parent.onFocus
             let isNewDocument = documentID != buffer.documentID
             if isNewDocument {
                 textView.undoManager?.removeAllActions()
@@ -141,6 +153,14 @@ struct SingleDiffTextView: NSViewRepresentable {
                 )
             }
 
+            if isNewDocument, let cursor = parent.initialCursor {
+                let line = min(max(0, cursor.line - 1), buffer.lineIndex.utf16Starts.count - 1)
+                let start = buffer.lineIndex.utf16Starts[line]
+                let content = line < buffer.lines.count ? buffer.lines[line] : ""
+                let prefix = String(content.prefix(max(0, cursor.column - 1)))
+                let offset = min(buffer.lineIndex.utf16Count, start + prefix.utf16.count)
+                textView.setSelectedRange(NSRange(location: offset, length: 0))
+            }
             applyingExternal = false
             deferredExternalUpdate = false
             documentID = buffer.documentID

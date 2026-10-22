@@ -1,11 +1,14 @@
 import Foundation
+import CoreFoundation
 
-nonisolated struct TextEncoding: Equatable, Sendable {
+nonisolated struct TextEncoding: Equatable, Sendable, Codable {
     let rawValue: UInt
     let displayName: String
     let byteOrderMark: Data
 
     static let utf8 = TextEncoding(rawValue: String.Encoding.utf8.rawValue, displayName: "UTF-8")
+    static let utf8BOM = TextEncoding(rawValue: String.Encoding.utf8.rawValue, displayName: "UTF-8 BOM", byteOrderMark: Data([0xEF, 0xBB, 0xBF]))
+    static let gb18030 = TextEncoding(rawValue: CFStringConvertEncodingToNSStringEncoding(CFStringEncoding(CFStringEncodings.GB_18030_2000.rawValue)), displayName: "GB18030")
     static let utf16LittleEndian = TextEncoding(
         rawValue: String.Encoding.utf16LittleEndian.rawValue,
         displayName: "UTF-16 LE",

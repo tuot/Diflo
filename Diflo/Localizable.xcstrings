@@ -1,8 +1,56 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-    "“%@”的修改将被丢弃。" : {
-
+    "粗略比较" : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Coarse Comparison"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "粗略比较"
+          }
+        }
+      }
+    },
+    "计算已达到预算，当前为粗略结果，合并范围可能扩大。" : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The comparison budget was reached. This coarse result may merge larger ranges."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "计算已达到预算，当前为粗略结果，合并范围可能扩大。"
+          }
+        }
+      }
+    },
+    "一个文件末尾有换行符，另一个没有。" : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "One file ends with a newline; the other does not."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "一个文件末尾有换行符，另一个没有。"
+          }
+        }
+      }
     },
     "%@：%@%@" : {
       "localizations" : {
@@ -15,6 +63,9 @@
       }
     },
     "%@另存为…" : {
+
+    },
+    "%lld 个空格" : {
 
     },
     "%lld 行" : {
@@ -30,8 +81,59 @@
         }
       }
     },
+    "⌘S 保存最后聚焦的编辑侧；⇧⌘S 另存为。文件菜单提供全部保存、重新加载与编码操作。关闭或退出前会询问未保存修改。未保存内容在停止编辑约 1 秒后保存为本地草稿，下次启动可选择恢复。突然断电前尚未写入的内容可能无法恢复。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⌘S saves the last focused editor; ⇧⌘S saves it as a new file. The File menu offers Save All, Reload, and encoding options. Closing or quitting prompts about unsaved changes. Unsaved content is saved locally about one second after editing stops and can be recovered on the next launch. Changes not yet written before power loss may not be recoverable."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⌘S 保存最后聚焦的编辑侧；⇧⌘S 另存为。文件菜单提供全部保存、重新加载与编码操作。关闭或退出前会询问未保存修改。未保存内容在停止编辑约 1 秒后保存为本地草稿，下次启动可选择恢复。突然断电前尚未写入的内容可能无法恢复。"
+          }
+        }
+      }
+    },
     "Diflo" : {
 
+    },
+    "Diflo 使用帮助" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diflo Help"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diflo 使用帮助"
+          }
+        }
+      }
+    },
+    "Diflo 在本地读取、比较和编辑你选择的文件。当前版本没有账号、广告、跟踪或将文件上传到服务器的功能。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diflo reads, compares, and edits selected files locally. This version has no accounts, advertising, tracking, or file uploads to a server."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diflo 在本地读取、比较和编辑你选择的文件。当前版本没有账号、广告、跟踪或将文件上传到服务器的功能。"
+          }
+        }
+      }
     },
     "editorFindMenu" : {
       "comment" : "Edit menu submenu containing text search commands.",
@@ -105,6 +207,23 @@
         }
       }
     },
+    "Tab 宽度" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tab Width"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tab 宽度"
+          }
+        }
+      }
+    },
     "上一个差异" : {
 
     },
@@ -117,17 +236,113 @@
     "下一个差异 (⌘↓)" : {
 
     },
-    "丢弃修改" : {
-
-    },
-    "丢弃并打开" : {
-
+    "为恢复工作，应用会在沙盒的 Application Support/Diflo 目录保存未保存的左右文本、文件位置和授权书签、编码、比较选项及光标位置。草稿包含你输入的内容，请按文件本身的敏感程度管理。最近对比最多记录 20 组文件位置和授权书签，不保存正文；编辑偏好保存在应用自己的设置中。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "To recover work, the app stores unsaved text from both sides, file locations and access bookmarks, encoding, comparison options, and cursor positions in Application Support/Diflo inside its sandbox. Drafts contain your text and should be treated as sensitively as the original files. Recent history stores up to 20 file pairs and access bookmarks without document contents. Editor preferences are stored in the app's own settings."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "为恢复工作，应用会在沙盒的 Application Support/Diflo 目录保存未保存的左右文本、文件位置和授权书签、编码、比较选项及光标位置。草稿包含你输入的内容，请按文件本身的敏感程度管理。最近对比最多记录 20 组文件位置和授权书签，不保存正文；编辑偏好保存在应用自己的设置中。"
+          }
+        }
+      }
     },
     "交换两侧" : {
 
     },
+    "体验示例" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Try Sample"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "体验示例"
+          }
+        }
+      }
+    },
+    "使用 ⌘↑ / ⌘↓ 跳转差异，点击中央箭头采纳一侧内容。末尾换行也是独立差异。粗略比较可能扩大合并范围，请先检查目标内容；⌘Z 可撤销。忽略规则只影响比较，不会修改文件。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Use ⌘↑ / ⌘↓ to navigate differences and the center arrows to accept content from either side. Final newlines are separate differences. Coarse comparisons may merge larger ranges; review the target first. Use ⌘Z to undo. Ignore rules affect comparisons without editing files."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用 ⌘↑ / ⌘↓ 跳转差异，点击中央箭头采纳一侧内容。末尾换行也是独立差异。粗略比较可能扩大合并范围，请先检查目标内容；⌘Z 可撤销。忽略规则只影响比较，不会修改文件。"
+          }
+        }
+      }
+    },
+    "使用编码重新打开" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reopen with Encoding"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用编码重新打开"
+          }
+        }
+      }
+    },
+    "保存" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Save"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存"
+          }
+        }
+      }
+    },
     "保存%@" : {
 
+    },
+    "保存与恢复" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Save and Recovery"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存与恢复"
+          }
+        }
+      }
     },
     "保存右侧" : {
 
@@ -135,12 +350,46 @@
     "保存左侧" : {
 
     },
+    "保存编码" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Save Encoding"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存编码"
+          }
+        }
+      }
+    },
     "光标位于第 %lld 行，第 %lld 列" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "光标位于第 %1$lld 行，第 %2$lld 列"
+          }
+        }
+      }
+    },
+    "全部保存" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Save All"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全部保存"
           }
         }
       }
@@ -161,8 +410,93 @@
         }
       }
     },
+    "关闭提示" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dismiss"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关闭提示"
+          }
+        }
+      }
+    },
+    "最近对比" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recent Comparisons"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最近对比"
+          }
+        }
+      }
+    },
+    "删除" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "删除"
+          }
+        }
+      }
+    },
     "取消" : {
 
+    },
+    "另存为…" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Save As…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "另存为…"
+          }
+        }
+      }
+    },
+    "只读" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Read-only"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "只读"
+          }
+        }
+      }
     },
     "右侧另存为…" : {
 
@@ -170,11 +504,48 @@
     "好" : {
 
     },
+    "字号：%lld" : {
+
+    },
     "左侧另存为…" : {
 
     },
+    "应用仅通过你选择或拖入的文件获得访问权限。授权书签用于下次重新打开文件；文件移动或系统权限改变后，可能需要重新选择。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The app accesses files you choose or drop into it. Access bookmarks allow reopening them later. You may need to select a file again if it moves or system permissions change."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "应用仅通过你选择或拖入的文件获得访问权限。授权书签用于下次重新打开文件；文件移动或系统权限改变后，可能需要重新选择。"
+          }
+        }
+      }
+    },
     "开始对比" : {
 
+    },
+    "当前侧只读" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Read-only Current Side"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当前侧只读"
+          }
+        }
+      }
     },
     "忽略大小写" : {
 
@@ -182,11 +553,96 @@
     "忽略所有空白" : {
 
     },
+    "忽略空白" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ignoring Whitespace"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "忽略空白"
+          }
+        }
+      }
+    },
     "忽略行尾空白" : {
 
     },
+    "恢复未保存的对比" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recover Unsaved Comparisons"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "恢复未保存的对比"
+          }
+        }
+      }
+    },
+    "恢复默认字号" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reset Text Size"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "恢复默认字号"
+          }
+        }
+      }
+    },
     "打开%@文件…" : {
 
+    },
+    "打开右侧文件…" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open Right File…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开右侧文件…"
+          }
+        }
+      }
+    },
+    "打开左侧文件…" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open Left File…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开左侧文件…"
+          }
+        }
+      }
     },
     "打开文件，右键显示文件操作" : {
 
@@ -194,11 +650,164 @@
     "批量合并" : {
 
     },
+    "按当前忽略规则相同" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Identical with Ignore Rules"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按当前忽略规则相同"
+          }
+        }
+      }
+    },
+    "换行符" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Line Endings"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "换行符"
+          }
+        }
+      }
+    },
     "撤销" : {
 
     },
     "操作失败" : {
 
+    },
+    "支持文本文件，导入上限 10 MiB、20,000 行。二进制和不能解码的文件会拒绝打开。内部统一使用 LF，保存时保留原编码、BOM 与混合换行；新增换行继承前一行的换行格式，首行采用文件默认格式。主动转换编码或换行会标为未保存。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Text files up to 10 MiB and 20,000 lines are supported. Binary and undecodable files are rejected. Editing uses LF internally; saving preserves the original encoding, BOM, and mixed line endings. New line endings inherit the preceding line's format, or the file default on the first line. Explicit encoding or line-ending conversion marks the file as modified."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "支持文本文件，导入上限 10 MiB、20,000 行。二进制和不能解码的文件会拒绝打开。内部统一使用 LF，保存时保留原编码、BOM 与混合换行；新增换行继承前一行的换行格式，首行采用文件默认格式。主动转换编码或换行会标为未保存。"
+          }
+        }
+      }
+    },
+    "放大文字" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Increase Text Size"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "放大文字"
+          }
+        }
+      }
+    },
+    "文件授权" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "File Access"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文件授权"
+          }
+        }
+      }
+    },
+    "文件格式与限制" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "File Formats and Limits"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文件格式与限制"
+          }
+        }
+      }
+    },
+    "文件被其他应用修改时，请重新加载、另存为或明确覆盖；重新加载会替换当前编辑。权限失效时重新选择文件。如果草稿保存失败，提示栏会说明原因，请及时手动保存。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "If another app changes a file, reload it, save your edits elsewhere, or explicitly overwrite it. Reload replaces the current edits. Select the file again if permission expires. If automatic draft saving fails, a banner explains why; save your work manually."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文件被其他应用修改时，请重新加载、另存为或明确覆盖；重新加载会替换当前编辑。权限失效时重新选择文件。如果草稿保存失败，提示栏会说明原因，请及时手动保存。"
+          }
+        }
+      }
+    },
+    "文本在本机处理" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Text Stays on This Mac"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文本在本机处理"
+          }
+        }
+      }
+    },
+    "文本相同" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Text Identical"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文本相同"
+          }
+        }
+      }
     },
     "新建对比" : {
 
@@ -206,23 +815,337 @@
     "新建对比 (⌘N)" : {
 
     },
-    "新建对比…" : {
-
+    "新建对比窗口" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New Comparison Window"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新建对比窗口"
+          }
+        }
+      }
     },
-    "替换未保存的内容？" : {
-
+    "显示空白字符" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show Whitespace"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示空白字符"
+          }
+        }
+      }
     },
-    "有未保存的修改" : {
-
+    "普通粘贴保留原文；⌥⇧⌘V 明确格式化后粘贴。⌘F 查找；⌘L 跳转到行；⌘+ / ⌘− 缩放字号。设置中可调整字号、Tab 宽度、自动换行和空白显示；比较菜单可将当前侧设为只读。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ordinary paste preserves the original text; ⌥⇧⌘V explicitly formats it. Use ⌘F to find, ⌘L to go to a line, and ⌘+ / ⌘− to change text size. Settings control text size, tab width, wrapping, and whitespace. The Compare menu can make the current side read-only."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "普通粘贴保留原文；⌥⇧⌘V 明确格式化后粘贴。⌘F 查找；⌘L 跳转到行；⌘+ / ⌘− 缩放字号。设置中可调整字号、Tab 宽度、自动换行和空白显示；比较菜单可将当前侧设为只读。"
+          }
+        }
+      }
+    },
+    "末尾换行不同" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Final Newline Differs"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "末尾换行不同"
+          }
+        }
+      }
+    },
+    "本地保存的数据" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Locally Stored Data"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本地保存的数据"
+          }
+        }
+      }
+    },
+    "本地恢复草稿与最近记录已清除。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Local recovery drafts and recent history have been cleared."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本地恢复草稿与最近记录已清除。"
+          }
+        }
+      }
+    },
+    "格式化后粘贴" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paste and Format"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "格式化后粘贴"
+          }
+        }
+      }
     },
     "比较" : {
 
     },
+    "比较与合并" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compare and Merge"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "比较与合并"
+          }
+        }
+      }
+    },
     "清空%@" : {
 
     },
+    "清空记录" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clear History"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "清空记录"
+          }
+        }
+      }
+    },
+    "清除" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clear"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "清除"
+          }
+        }
+      }
+    },
+    "清除恢复草稿与最近记录…" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clear Recovery Drafts and History…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "清除恢复草稿与最近记录…"
+          }
+        }
+      }
+    },
+    "清除数据" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clear Data"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "清除数据"
+          }
+        }
+      }
+    },
+    "清除本地恢复草稿与最近记录？" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clear local recovery drafts and recent history?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "清除本地恢复草稿与最近记录？"
+          }
+        }
+      }
+    },
+    "移除" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移除"
+          }
+        }
+      }
+    },
     "空白对比" : {
 
+    },
+    "粗略比较：合并范围可能扩大" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Coarse Comparison: Merge Ranges May Be Larger"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "粗略比较：合并范围可能扩大"
+          }
+        }
+      }
+    },
+    "编辑" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Editing"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "编辑"
+          }
+        }
+      }
+    },
+    "缩小文字" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Decrease Text Size"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "缩小文字"
+          }
+        }
+      }
+    },
+    "自动换行" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wrap Lines"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自动换行"
+          }
+        }
+      }
+    },
+    "草稿版本无法读取，原文件已保留。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This draft version cannot be read. The original file has been preserved."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "草稿版本无法读取，原文件已保留。"
+          }
+        }
+      }
     },
     "行 %lld · 列 %lld" : {
       "localizations" : {
@@ -234,8 +1157,73 @@
         }
       }
     },
-    "返回新建页将丢失左右两侧尚未保存的内容。" : {
-
+    "行号跳转" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Go to Line"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "跳转到行"
+          }
+        }
+      }
+    },
+    "设置自动保存，并应用到所有对比窗口。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Settings are saved automatically and apply to all comparison windows."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "设置自动保存，并应用到所有对比窗口。"
+          }
+        }
+      }
+    },
+    "跳转" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Go"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "跳转"
+          }
+        }
+      }
+    },
+    "跳转到行…" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Go to Line…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "跳转到行…"
+          }
+        }
+      }
     },
     "选择%@文件" : {
 
@@ -243,8 +1231,93 @@
     "选择两个文本文件，或从空白内容开始" : {
 
     },
+    "选择两个文本文件，或创建空白对比后输入、粘贴文本。点击文件标题或将文件拖到标题上可替换该侧。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose two text files, or start a blank comparison and type or paste text. Click a file header or drop a file on it to replace that side."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择两个文本文件，或创建空白对比后输入、粘贴文本。点击文件标题或将文件拖到标题上可替换该侧。"
+          }
+        }
+      }
+    },
     "重做" : {
 
+    },
+    "重新加载当前文件" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reload Current File"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新加载当前文件"
+          }
+        }
+      }
+    },
+    "问题排查" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Troubleshooting"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "问题排查"
+          }
+        }
+      }
+    },
+    "隐私说明" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Privacy Information"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "隐私说明"
+          }
+        }
+      }
+    },
+    "首页可单独删除草稿、移除或清空最近记录。关闭对比时明确丢弃，或保存后结束对比，都会删除对应草稿。下方操作仅清除未被窗口使用的恢复草稿与最近记录，当前窗口内容保留。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On the start screen, delete drafts individually or remove and clear recent history. Explicitly discarding a comparison or closing it after saving removes its draft. The action below clears only recovery drafts not in use by a window and recent history. Current window contents remain available."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "首页可单独删除草稿、移除或清空最近记录。关闭对比时明确丢弃，或保存后结束对比，都会删除对应草稿。下方操作仅清除未被窗口使用的恢复草稿与最近记录，当前窗口内容保留。"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

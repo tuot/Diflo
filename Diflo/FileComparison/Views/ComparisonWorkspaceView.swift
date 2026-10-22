@@ -2,16 +2,26 @@ import SwiftUI
 
 struct ComparisonWorkspaceView: View {
     let session: ComparisonSession
+    var fileActions: ComparisonFileActions? = nil
+
+    private var actions: ComparisonFileActions { fileActions ?? ComparisonFileActions(session: session) }
 
     @State private var scrollCoordinator = DualScrollCoordinator()
     @State private var cursorPositions: [ComparisonSide: CursorPosition] = [
         .left: .start,
         .right: .start
     ]
-    @State private var isDiscardConfirmationPresented = false
 
     var body: some View {
         VStack(spacing: 0) {
+            if let message = session.protectionMessage {
+                HStack {
+                    Image(systemName: "exclamationmark.triangle")
+                    Text(message).font(.callout)
+                    Spacer()
+                    Button("关闭提示") { session.protectionMessage = nil }
+                }.padding(8).background(.yellow.opacity(0.12))
+            }
             // 文件标头与编辑器两侧对齐，低频操作通过右键菜单提供。
             HStack(spacing: 0) {
                 BufferHeaderView(
@@ -20,20 +30,36 @@ struct ComparisonWorkspaceView: View {
                     open: { open(.left) },
                     clear: { clear(.left) },
                     save: { save(.left, saveAs: false) },
-                    saveAs: { save(.left, saveAs: true) }
+                    saveAs: { save(.left, saveAs: true) },
+                    onDropURL: { url in Task { await actions.open(url: url, side: .left) } }
                 )
                 panelSeparator
                     .overlay {
                         DifferenceNavigationView(session: session)
                     }
-                BufferHeaderView(
-                    buffer: session.rightBuffer,
-                    side: .right,
-                    open: { open(.right) },
-                    clear: { clear(.right) },
-                    save: { save(.right, saveAs: false) },
-                    saveAs: { save(.right, saveAs: true) }
-                )
+                HStack(spacing: 0) {
+                    if session.result?.precision == .coarse {
+                        Label("粗略比较", systemImage: "exclamationmark.triangle.fill")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(.orange)
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 4)
+                            .background(.orange.opacity(0.10), in: .capsule)
+                            .fixedSize()
+                            .padding(.leading, 10)
+                            .help("计算已达到预算，当前为粗略结果，合并范围可能扩大。")
+                    }
+                    BufferHeaderView(
+                        buffer: session.rightBuffer,
+                        side: .right,
+                        open: { open(.right) },
+                        clear: { clear(.right) },
+                        save: { save(.right, saveAs: false) },
+                        saveAs: { save(.right, saveAs: true) },
+                        onDropURL: { url in Task { await actions.open(url: url, side: .right) } }
+                    )
+                }
+                .frame(maxWidth: .infinity)
                 Divider().opacity(0.5)
                 Color.clear.frame(width: 12)
             }
@@ -46,14 +72,14 @@ struct ComparisonWorkspaceView: View {
             MeldDualEditorWorkspaceView(
                 session: session,
                 scrollCoordinator: scrollCoordinator,
-                onCursorChanged: { side, pos in cursorPositions[side] = pos }
+                onCursorChanged: { side, pos in cursorPositions[side] = pos; session.cursors[side] = pos }
             )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .layoutPriority(1)
 
             HStack(spacing: 0) {
                 BufferStatusBar(buffer: session.leftBuffer, cursor: cursorPositions[.left] ?? .start)
-                Color.clear.frame(width: ChangeGutterView.preferredWidth)
+                comparisonFooterStatus
                 BufferStatusBar(buffer: session.rightBuffer, cursor: cursorPositions[.right] ?? .start)
                 Color.clear.frame(width: 12)
             }
@@ -71,6 +97,9 @@ struct ComparisonWorkspaceView: View {
             newComparison: requestReturn,
             saveLeft: { save(.left, saveAs: false) },
             saveRight: { save(.right, saveAs: false) },
+            openLeft: { open(.left) },
+            openRight: { open(.right) },
+            reload: { side, encoding in Task { await actions.reload(side: side, encoding: encoding) } },
             saveLeftAs: { save(.left, saveAs: true) },
             saveRightAs: { save(.right, saveAs: true) }
         ))
@@ -92,16 +121,6 @@ struct ComparisonWorkspaceView: View {
                 )
             }
         }
-        .confirmationDialog(
-            "有未保存的修改",
-            isPresented: $isDiscardConfirmationPresented,
-            titleVisibility: .visible
-        ) {
-            Button("丢弃修改", role: .destructive, action: discardAndReturn)
-            Button("取消", role: .cancel) {}
-        } message: {
-            Text("返回新建页将丢失左右两侧尚未保存的内容。")
-        }
         .onChange(of: session.selectedHunkID) { _, newID in
             if let newID, let hunk = session.result?.hunks.first(where: { $0.id == newID }) {
                 scrollCoordinator.scrollTo(hunk: hunk)
@@ -112,12 +131,38 @@ struct ComparisonWorkspaceView: View {
         }
     }
 
+    private var comparisonFooterStatus: some View {
+        HStack(spacing: 6) {
+            if session.result?.hasTrailingNewlineDifference == true {
+                Text("末尾换行不同")
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Color.primary.opacity(0.04), in: .capsule)
+                    .help("一个文件末尾有换行符，另一个没有。")
+            }
+            if session.options.ignoreWhitespace {
+                Text("忽略空白")
+            } else if session.options.ignoreTrailingWhitespace {
+                Text("忽略行尾空白")
+            }
+            if session.options.ignoreCase {
+                Text("忽略大小写")
+            }
+        }
+        .font(.system(size: 10))
+        .foregroundStyle(.secondary)
+        .fixedSize()
+        .padding(.horizontal, 4)
+        .frame(minWidth: ChangeGutterView.preferredWidth)
+    }
+
     private var windowTitle: some View {
         Text("Diflo")
             .font(.system(size: 13, weight: .semibold))
     }
 
     private func clear(_ side: ComparisonSide) {
+        guard !session.buffer(for: side).isReadOnly else { return }
         let scrollView = side == .left ? scrollCoordinator.leftScrollView : scrollCoordinator.rightScrollView
         if let editor = scrollView?.documentView as? DiffTextView {
             editor.window?.makeFirstResponder(editor)
@@ -141,49 +186,7 @@ struct ComparisonWorkspaceView: View {
             }
     }
 
-    private func requestReturn() {
-        if !session.returnToLauncher(discardingChanges: false) {
-            isDiscardConfirmationPresented = true
-        }
-    }
-
-    private func discardAndReturn() {
-        session.returnToLauncher(discardingChanges: true)
-    }
-
-    private func open(_ side: ComparisonSide) {
-        let buffer = side == .left ? session.leftBuffer : session.rightBuffer
-        guard buffer.isDirty else {
-            openFile(side)
-            return
-        }
-        guard let window = NSApp.keyWindow ?? NSApp.mainWindow
-            ?? NSApp.windows.first(where: { $0.isVisible && $0.canBecomeKey && !$0.isSheet })
-        else { return }
-
-        let alert = NSAlert()
-        alert.messageText = "替换未保存的内容？"
-        alert.informativeText = "“\(buffer.displayName)”的修改将被丢弃。"
-        alert.addButton(withTitle: "取消")
-        alert.addButton(withTitle: "丢弃并打开")
-        // 以窗口内原生警告呈现，让系统自动省略应用图标区域。
-        alert.beginSheetModal(for: window) { response in
-            guard response == .alertSecondButtonReturn else { return }
-            openFile(side)
-        }
-    }
-
-    private func openFile(_ side: ComparisonSide) {
-        guard let url = FilePanel.openTextFile() else { return }
-        Task { await session.open(url, for: side) }
-    }
-
-    private func save(_ side: ComparisonSide, saveAs: Bool) {
-        let buffer = side == .left ? session.leftBuffer : session.rightBuffer
-        let url = saveAs || buffer.url == nil
-            ? FilePanel.saveTextFile(suggestedName: buffer.displayName)
-            : buffer.url
-        guard let url else { return }
-        Task { await session.save(side, to: url) }
-    }
+    private func requestReturn() { Task { await actions.newComparison() } }
+    private func open(_ side: ComparisonSide) { Task { await actions.open(side: side) } }
+    private func save(_ side: ComparisonSide, saveAs: Bool) { Task { await actions.save(side: side, saveAs: saveAs) } }
 }

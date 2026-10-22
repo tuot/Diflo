@@ -4,10 +4,16 @@ nonisolated struct EditorBuffer: Equatable, Sendable {
     let documentID = UUID()
     private(set) var text: String
     private(set) var lineIndex: TextLineIndex
+    var originalSeparators: [LineEnding] = []
+    var isReadOnly = false
     var url: URL?
     var displayName: String
     var encoding: TextEncoding
-    var lineEnding: LineEnding
+    var lineEnding: LineEnding {
+        didSet {
+            if lineEnding != oldValue { originalSeparators = Array(repeating: lineEnding, count: text.utf16.count { $0 == 10 }) }
+        }
+    }
     var isDirty: Bool
     var revision: Int
     var lastKnownModificationDate: Date?
@@ -40,6 +46,7 @@ nonisolated struct EditorBuffer: Equatable, Sendable {
         displayName = file.displayName
         encoding = file.encoding
         lineEnding = file.lineEnding
+        originalSeparators = file.originalSeparators
         isDirty = false
         revision = 0
         lastKnownModificationDate = file.lastKnownModificationDate
@@ -70,6 +77,7 @@ nonisolated struct EditorBuffer: Equatable, Sendable {
         let normalized = LineParser.normalize(newText)
         guard normalized != text else { return self }
         var copy = self
+        copy.originalSeparators = FileTextFormat.updating(separators: originalSeparators, old: text, new: normalized, fallback: lineEnding)
         copy.text = normalized
         copy.lineIndex = TextLineIndex(normalizedText: normalized)
         copy.revision += 1
@@ -87,6 +95,7 @@ nonisolated struct EditorBuffer: Equatable, Sendable {
             normalizedText: text,
             encoding: encoding,
             lineEnding: lineEnding,
+            originalSeparators: originalSeparators,
             lastKnownModificationDate: lastKnownModificationDate
         )
     }

@@ -2,6 +2,7 @@ import AppKit
 
 final class ChangeGutterView: NSView {
     static let preferredWidth: CGFloat = 88
+    var editorForSide: ((ComparisonSide) -> DiffTextView?)?
     var scrollOffsets: (() -> (left: Double, right: Double))?
     private var hunks: [DiffHunk] = []
     private var selectedHunkID: DiffHunk.ID?
@@ -211,6 +212,9 @@ final class ChangeGutterView: NSView {
 
     func connectionBand(for hunk: DiffHunk, side: ComparisonSide) -> NSRect {
         let offsets = scrollOffsets?() ?? (leftOffset, rightOffset)
+        if let editor = editorForSide?(side) {
+            return editor.bandRect(for: side == .left ? hunk.leftLineRange : hunk.rightLineRange, width: bounds.width, offset: CGFloat(side == .left ? offsets.0 : offsets.1))
+        }
         return DiffTextView.diffBandRect(for: side == .left ? hunk.leftLineRange : hunk.rightLineRange,
                                         width: bounds.width, offset: CGFloat(side == .left ? offsets.0 : offsets.1))
     }
@@ -252,10 +256,10 @@ final class ChangeGutterView: NSView {
         }
 
         var buttons: [(ComparisonSide, NSRect)] = []
-        if !hunk.leftLineRange.isEmpty {
+        if !hunk.leftLineRange.isEmpty || hunk.isTrailingNewline {
             buttons.append((.left, buttonRect(at: bounds.minX + inset)))
         }
-        if !hunk.rightLineRange.isEmpty {
+        if !hunk.rightLineRange.isEmpty || hunk.isTrailingNewline {
             buttons.append((.right, buttonRect(at: bounds.maxX - inset)))
         }
         return buttons

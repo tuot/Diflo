@@ -1,6 +1,6 @@
 import Foundation
 
-nonisolated enum LineEnding: String, Equatable, Sendable, CaseIterable {
+nonisolated enum LineEnding: String, Equatable, Sendable, Codable, CaseIterable {
     case lf
     case crlf
     case cr
