@@ -11,7 +11,7 @@ final class ComparisonFileActions {
     private var activeScopes: [URL] = []
     init(session: ComparisonSession) { self.session = session }
 
-    func prepareToDiscard(sides: [ComparisonSide], decide: ((ComparisonSide) async -> Decision)? = nil,
+    func prepareToDiscard(sides: [ComparisonSide], decide: (([ComparisonSide]) async -> Decision)? = nil,
                           save: ((ComparisonSide) async -> Bool)? = nil) async -> Bool {
         guard !isPresentingDecision else { return false }
         isPresentingDecision = true
@@ -19,29 +19,42 @@ final class ComparisonFileActions {
         commitComposition()
         // Always finish ongoing saves before deciding whether the window can close.
         await session.waitForSaves()
-        for side in sides where session.buffer(for: side).isDirty {
-            let decision: Decision
-            if let decide { decision = await decide(side) } else { decision = await prompt(side) }
-            switch decision {
-            case .cancel: return false
-            case .discard: continue
-            case .save:
+        let dirtySides = sides.filter { session.buffer(for: $0).isDirty }
+        guard !dirtySides.isEmpty else { return true }
+
+        let decision: Decision
+        if let decide { decision = await decide(dirtySides) }
+        else { decision = await prompt(dirtySides) }
+        switch decision {
+        case .cancel: return false
+        case .discard: return true
+        case .save:
+            for side in dirtySides where session.buffer(for: side).isDirty {
                 let success: Bool
                 if let save { success = await save(side) }
                 else { success = await self.save(side: side) }
                 guard success, !session.buffer(for: side).isDirty else { return false }
             }
+            return sides.allSatisfy { !session.buffer(for: $0).isDirty }
         }
-        return true
     }
 
-    private func prompt(_ side: ComparisonSide) async -> Decision {
+    private func prompt(_ sides: [ComparisonSide]) async -> Decision {
         let alert = NSAlert()
-        alert.messageText = "保存对“\(session.buffer(for: side).displayName)”的修改？"
-        alert.informativeText = "尚未保存的修改将被丢弃。"
-        alert.addButton(withTitle: "保存")
-        alert.addButton(withTitle: "丢弃修改")
-        alert.addButton(withTitle: "取消")
+        let multiple = sides.count > 1
+        alert.messageText = multiple
+            ? String(localized: "保存此对比的修改？")
+            : String(localized: "保存对“\(session.buffer(for: sides[0]).displayName)”的修改？")
+        let files = sides.map { side in
+            let name = session.buffer(for: side).displayName
+            return side == .left
+                ? String(localized: "左侧：\(name) · 未保存")
+                : String(localized: "右侧：\(name) · 未保存")
+        }.joined(separator: "\n")
+        alert.informativeText = files + "\n\n" + String(localized: "尚未保存的修改将被丢弃。")
+        alert.addButton(withTitle: multiple ? String(localized: "全部保存") : String(localized: "保存"))
+        alert.addButton(withTitle: multiple ? String(localized: "丢弃全部修改") : String(localized: "丢弃修改"))
+        alert.addButton(withTitle: String(localized: "取消"))
         let response = await present(alert)
         return response == .alertFirstButtonReturn ? .save : response == .alertSecondButtonReturn ? .discard : .cancel
     }

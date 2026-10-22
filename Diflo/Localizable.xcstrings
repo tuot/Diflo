@@ -1,57 +1,6 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-    "粗略比较" : {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Coarse Comparison"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "粗略比较"
-          }
-        }
-      }
-    },
-    "计算已达到预算，当前为粗略结果，合并范围可能扩大。" : {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "The comparison budget was reached. This coarse result may merge larger ranges."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "计算已达到预算，当前为粗略结果，合并范围可能扩大。"
-          }
-        }
-      }
-    },
-    "一个文件末尾有换行符，另一个没有。" : {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "One file ends with a newline; the other does not."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "一个文件末尾有换行符，另一个没有。"
-          }
-        }
-      }
-    },
     "%@：%@%@" : {
       "localizations" : {
         "en" : {
@@ -67,6 +16,23 @@
     },
     "%lld 个空格" : {
 
+    },
+    "%lld 分钟前保存" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saved %lld min ago"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 分钟前保存"
+          }
+        }
+      }
     },
     "%lld 行" : {
 
@@ -224,6 +190,23 @@
         }
       }
     },
+    "一个文件末尾有换行符，另一个没有。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "One file ends with a newline; the other does not."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一个文件末尾有换行符，另一个没有。"
+          }
+        }
+      }
+    },
     "上一个差异" : {
 
     },
@@ -235,6 +218,26 @@
     },
     "下一个差异 (⌘↓)" : {
 
+    },
+    "丢弃修改" : {
+
+    },
+    "丢弃全部修改" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Discard All Changes"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "丢弃全部修改"
+          }
+        }
+      }
     },
     "为恢复工作，应用会在沙盒的 Application Support/Diflo 目录保存未保存的左右文本、文件位置和授权书签、编码、比较选项及光标位置。草稿包含你输入的内容，请按文件本身的敏感程度管理。最近对比最多记录 20 组文件位置和授权书签，不保存正文；编辑偏好保存在应用自己的设置中。" : {
       "extractionState" : "manual",
@@ -344,11 +347,62 @@
         }
       }
     },
+    "保存于 %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saved %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存于 %@"
+          }
+        }
+      }
+    },
     "保存右侧" : {
 
     },
+    "保存对“%@”的修改？" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Save changes to “%@”?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存对“%@”的修改？"
+          }
+        }
+      }
+    },
     "保存左侧" : {
 
+    },
+    "保存此对比的修改？" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Save changes to this comparison?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存此对比的修改？"
+          }
+        }
+      }
     },
     "保存编码" : {
       "extractionState" : "manual",
@@ -444,6 +498,23 @@
         }
       }
     },
+    "刚刚保存" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saved just now"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "刚刚保存"
+          }
+        }
+      }
+    },
     "删除" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -498,6 +569,23 @@
         }
       }
     },
+    "右侧：%@ · 未保存" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Right: %@ · Unsaved"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "右侧：%@ · 未保存"
+          }
+        }
+      }
+    },
     "右侧另存为…" : {
 
     },
@@ -506,6 +594,40 @@
     },
     "字号：%lld" : {
 
+    },
+    "尚未保存的修改将被丢弃。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unsaved changes will be lost."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "尚未保存的修改将被丢弃。"
+          }
+        }
+      }
+    },
+    "左侧：%@ · 未保存" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Left: %@ · Unsaved"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "左侧：%@ · 未保存"
+          }
+        }
+      }
     },
     "左侧另存为…" : {
 
@@ -1062,6 +1184,23 @@
     "空白对比" : {
 
     },
+    "粗略比较" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Coarse Comparison"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "粗略比较"
+          }
+        }
+      }
+    },
     "粗略比较：合并范围可能扩大" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1170,6 +1309,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "跳转到行"
+          }
+        }
+      }
+    },
+    "计算已达到预算，当前为粗略结果，合并范围可能扩大。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The comparison budget was reached. This coarse result may merge larger ranges."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "计算已达到预算，当前为粗略结果，合并范围可能扩大。"
           }
         }
       }
